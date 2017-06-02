@@ -3,10 +3,10 @@
 This collection demonstrates how to construct and train a deep,
 bidirectional stacked LSTM using a CNN features as input with CTC loss
 to perform robust word recognition. The model is a straightforward
-adaptation of Shi et al.'s CRNN architecture (arXiv:1507.0571). Code
-provided downloads and trains using Jaderberg et al.'s synthetic data
-(doi: 10.1007/s11263-015-0823-z).
-
+adaptation of Shi et al.'s CRNN architecture
+([arXiv:1507.0571](https://arxiv.org/abs/1507.05717)). The provided code
+downloads and trains using Jaderberg et al.'s synthetic data ([IJCV
+2016](http://dx.doi.org/10.1007/s11263-015-0823-z)).
 
 
 # Structure
