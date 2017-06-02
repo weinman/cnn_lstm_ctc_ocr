@@ -71,8 +71,9 @@ validation character error to reach 45% (using the default
 parameters); at one hour (roughly 7000 iterations), the validation
 error is just over 20%.
 
-With the full training data, the model typically converges to around
-7% training character error and 35% word error, both varying by 2-5%.
+With the full training data, by one million iterations the model
+typically converges to around 7% training character error and 35% word
+error, both varying by 2-5%.
 
 # Testing
 
