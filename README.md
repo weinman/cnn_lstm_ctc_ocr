@@ -8,6 +8,8 @@ adaptation of Shi et al.'s CRNN architecture
 downloads and trains using Jaderberg et al.'s synthetic data ([IJCV
 2016](http://dx.doi.org/10.1007/s11263-015-0823-z)).
 
+Developed for Tensorflow 1.1
+
 
 # Structure
 
