@@ -18,7 +18,7 @@ import tensorflow as tf
 from tensorflow.contrib import learn
 
 # Layer params:   Filts K  Padding  Name     BatchNorm?
-layer_params = [ [  64, 3, 'same',  'conv1', False], 
+layer_params = [ [  64, 3, 'valid', 'conv1', False], 
                  [  64, 3, 'same',  'conv2', True], # pool
                  [ 128, 3, 'same',  'conv3', False], 
                  [ 128, 3, 'same',  'conv4', True], # hpool
@@ -106,7 +106,10 @@ def convnet_layers(inputs, widths, mode):
         after_conv1 = tf.subtract( widths, conv1_trim)
         after_pool2 = tf.floor_div( after_conv1, two )
         after_pool4 = tf.subtract(after_pool2, one)
-        sequence_length = tf.reshape(after_pool4,[-1], name='seq_len') # Vectorize
+        after_pool6 = tf.subtract(after_pool4, one) 
+        after_pool8 = after_pool6
+
+        sequence_length = tf.reshape(after_pool8,[-1], name='seq_len') # Vectorize
 
         return features,sequence_length
 
