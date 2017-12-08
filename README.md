@@ -79,10 +79,10 @@ error, both varying by 2-5%.
 
 # Testing
 
-The test script streams statistics for small batches of validation (or
-test) data. It ouputs the label error (percentage of characters
-predicted incorrectly), the test loss, and the sequence error
-(percentage of words--entire sequences--predicted incorrectly.)
+The test script streams statistics for small batches of validation (or test)
+data. It prints the iteration, test batch loss, label error (percentage of
+characters predicted incorrectly), and the sequence error (percentage of
+words--entire sequences--predicted incorrectly.)
 
 # Configuration
 
