@@ -84,6 +84,18 @@ data. It prints the iteration, test batch loss, label error (percentage of
 characters predicted incorrectly), and the sequence error (percentage of
 words--entire sequences--predicted incorrectly.)
 
+# Validation
+
+To see the output of a small set of instances, the script `validation.py` 
+allows you to load a model and read an image one at a time via the process's 
+standard input and print the decoded output for each. For example
+
+    cd src ; python validate.py < ~/paths_to_images.txt
+
+Alternatively, you can run the program interactively by typing image paths
+in the terminal (one per line, type Control-D when you want the model to run the
+input entered so far).
+
 # Configuration
 
 There are many command-line options to configure training
