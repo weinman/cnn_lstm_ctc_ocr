@@ -137,7 +137,7 @@ def main(argv=None):
             loss,label_error,sequence_error = _get_testing(
                 logits,sequence_length,label,length)
 
-        global_step = tf.contrib.framework.get_or_create_global_step()
+        global_step = tf.train.get_global_step()
 
         session_config = _get_session_config()
         restore_model = _get_init_trained()
@@ -149,7 +149,8 @@ def main(argv=None):
         summary_writer = tf.summary.FileWriter( os.path.join(FLAGS.model,
                                                             FLAGS.output) )
 
-        step_ops = [global_step, loss, label_error, sequence_error]
+        #step_ops = [global_step, loss, label_error, sequence_error]
+        step_ops = [loss, label_error, sequence_error]
 
         with tf.Session(config=session_config) as sess:
             
