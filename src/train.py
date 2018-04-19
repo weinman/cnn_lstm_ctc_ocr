@@ -168,7 +168,7 @@ def _get_init_pretrained():
 def main(argv=None):
 
     with tf.Graph().as_default():
-        global_step = tf.contrib.framework.get_or_create_global_step()
+        global_step = tf.train.get_or_create_global_step()
         
         image,width,label = _get_input()
 
