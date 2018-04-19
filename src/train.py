@@ -41,7 +41,7 @@ tf.app.flags.DEFINE_float('decay_rate',0.9,
                           """Learning rate decay base""")
 tf.app.flags.DEFINE_float('decay_steps',2**16,
                           """Learning rate decay exponent scale""")
-tf.app.flags.DEFINE_float('decay_staircase',False,
+tf.app.flags.DEFINE_boolean('decay_staircase',False,
                           """Staircase learning rate decay by integer division""")
 
 
@@ -168,7 +168,7 @@ def _get_init_pretrained():
 def main(argv=None):
 
     with tf.Graph().as_default():
-        global_step = tf.contrib.framework.get_or_create_global_step()
+        global_step = tf.train.get_or_create_global_step()
         
         image,width,label = _get_input()
 
