@@ -26,6 +26,7 @@ from tensorflow.contrib import learn
 
 import mjsynth
 import model
+from generate_dictionary import dictionary_from_file
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -79,8 +80,11 @@ def _get_output(rnn_logits,sequence_length):
        predictions: Results of CTC beacm search decoding
     """
     with tf.name_scope("test"):
-        predictions,_ = tf.nn.ctc_beam_search_decoder(rnn_logits, 
-                                                   sequence_length,
+        lexicon = _get_dictionary_tensor('lexicon.txt', mjsynth.out_charset)
+	predictions,_ = tf.nn.ctc_beam_search_decoder_trie(rnn_logits,
+						   sequence_length,
+						   alphabet_size=mjsynth.num_classes() ,
+						   dictionary=lexicon,
                                                    beam_width=128,
                                                    top_paths=1,
                                                    merge_repeated=True)
@@ -123,6 +127,10 @@ def _get_string(labels):
     """Transform an 1D array of labels into the corresponding character string"""
     string = ''.join([mjsynth.out_charset[c] for c in labels])
     return string
+
+def _get_dictionary_tensor(dictionary_path, charset):
+    return tf.sparse_tensor_to_dense(tf.to_int32(
+	dictionary_from_file(dictionary_path, charset)))
 
 def main(argv=None):
 
