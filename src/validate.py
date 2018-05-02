@@ -80,15 +80,16 @@ def _get_output(rnn_logits,sequence_length):
        predictions: Results of CTC beacm search decoding
     """
     with tf.name_scope("test"):
-        lexicon = _get_dictionary_tensor('lexicon.txt', mjsynth.out_charset)
+        lexicon = _get_dictionary_tensor('../data/lexicon.txt', mjsynth.out_charset)
 	predictions,_ = tf.nn.ctc_beam_search_decoder_trie(rnn_logits,
 						   sequence_length,
 						   alphabet_size=mjsynth.num_classes() ,
 						   dictionary=lexicon,
                                                    beam_width=128,
-                                                   top_paths=1,
+                                                   top_paths=10,
                                                    merge_repeated=True)
 
+    print(predictions)
     return predictions
 
 
@@ -163,9 +164,10 @@ def main(argv=None):
                 # Eliminate any trailing newline from filename
                 image_data = _get_image(line.rstrip())
                 # Get prediction for single image (isa SparseTensorValue)
-                [output] = sess.run(prediction,{ image: image_data, 
+                output_list = sess.run(prediction,{ image: image_data, 
                                                  width: image_data.shape[1]} )
-                print(_get_string(output.values))
+		for output in output_list:
+                    print(_get_string(output.values))
 
 if __name__ == '__main__':
     tf.app.run()
