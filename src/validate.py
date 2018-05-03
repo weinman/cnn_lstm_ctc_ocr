@@ -97,7 +97,6 @@ def _get_output(rnn_logits,sequence_length):
 	    					   beam_width=128,
 	    					   top_paths=1,
 	    					   merge_repeated=True)
-
     return predictions
 
 
