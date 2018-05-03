@@ -26,7 +26,7 @@ from tensorflow.contrib import learn
 
 import mjsynth
 import model
-from generate_dictionary import dictionary_from_file
+from lexicon import dictionary_from_file
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -34,6 +34,8 @@ tf.app.flags.DEFINE_string('model','../data/model',
                           """Directory for model checkpoints""")
 tf.app.flags.DEFINE_string('device','/gpu:0',
                            """Device for graph placement""")
+tf.app.flags.DEFINE_string('lexicon','',
+			   """File containing lexicon of image words""")
 
 tf.logging.set_verbosity(tf.logging.WARN)
 
@@ -80,16 +82,22 @@ def _get_output(rnn_logits,sequence_length):
        predictions: Results of CTC beacm search decoding
     """
     with tf.name_scope("test"):
-        lexicon = _get_dictionary_tensor('../data/lexicon.txt', mjsynth.out_charset)
-	predictions,_ = tf.nn.ctc_beam_search_decoder_trie(rnn_logits,
-						   sequence_length,
-						   alphabet_size=mjsynth.num_classes() ,
-						   dictionary=lexicon,
-                                                   beam_width=128,
-                                                   top_paths=10,
-                                                   merge_repeated=True)
+	if FLAGS.lexicon:
+	    dict_tensor = _get_dictionary_tensor(FLAGS.lexicon, mjsynth.out_charset)
+	    predictions,_ = tf.nn.ctc_beam_search_decoder_trie(rnn_logits,
+	    					   sequence_length,
+	    					   alphabet_size=mjsynth.num_classes() ,
+	    					   dictionary=dict_tensor,
+	    					   beam_width=128,
+	    					   top_paths=1,
+	    					   merge_repeated=True)
+	else:
+	    predictions,_ = tf.nn.ctc_beam_search_decoder(rnn_logits,
+	    					   sequence_length,
+	    					   beam_width=128,
+	    					   top_paths=1,
+	    					   merge_repeated=True)
 
-    print(predictions)
     return predictions
 
 
