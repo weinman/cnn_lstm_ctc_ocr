@@ -171,10 +171,9 @@ def main(argv=None):
                 # Eliminate any trailing newline from filename
                 image_data = _get_image(line.rstrip())
                 # Get prediction for single image (isa SparseTensorValue)
-                output_list = sess.run(prediction,{ image: image_data, 
+                [output] = sess.run(prediction,{ image: image_data, 
                                                  width: image_data.shape[1]} )
-		for output in output_list:
-                    print(_get_string(output.values))
+                print(_get_string(output.values))
 
 if __name__ == '__main__':
     tf.app.run()
