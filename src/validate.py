@@ -26,6 +26,7 @@ from tensorflow.contrib import learn
 
 import mjsynth
 import model
+from lexicon import dictionary_from_file
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -33,6 +34,8 @@ tf.app.flags.DEFINE_string('model','../data/model',
                           """Directory for model checkpoints""")
 tf.app.flags.DEFINE_string('device','/gpu:0',
                            """Device for graph placement""")
+tf.app.flags.DEFINE_string('lexicon','',
+			   """File containing lexicon of image words""")
 
 tf.logging.set_verbosity(tf.logging.WARN)
 
@@ -79,12 +82,21 @@ def _get_output(rnn_logits,sequence_length):
        predictions: Results of CTC beacm search decoding
     """
     with tf.name_scope("test"):
-        predictions,_ = tf.nn.ctc_beam_search_decoder(rnn_logits, 
-                                                   sequence_length,
-                                                   beam_width=128,
-                                                   top_paths=1,
-                                                   merge_repeated=True)
-
+	if FLAGS.lexicon:
+	    dict_tensor = _get_dictionary_tensor(FLAGS.lexicon, mjsynth.out_charset)
+	    predictions,_ = tf.nn.ctc_beam_search_decoder_trie(rnn_logits,
+	    					   sequence_length,
+	    					   alphabet_size=mjsynth.num_classes() ,
+	    					   dictionary=dict_tensor,
+	    					   beam_width=128,
+	    					   top_paths=1,
+	    					   merge_repeated=True)
+	else:
+	    predictions,_ = tf.nn.ctc_beam_search_decoder(rnn_logits,
+	    					   sequence_length,
+	    					   beam_width=128,
+	    					   top_paths=1,
+	    					   merge_repeated=True)
     return predictions
 
 
@@ -123,6 +135,10 @@ def _get_string(labels):
     """Transform an 1D array of labels into the corresponding character string"""
     string = ''.join([mjsynth.out_charset[c] for c in labels])
     return string
+
+def _get_dictionary_tensor(dictionary_path, charset):
+    return tf.sparse_tensor_to_dense(tf.to_int32(
+	dictionary_from_file(dictionary_path, charset)))
 
 def main(argv=None):
 
