@@ -220,7 +220,7 @@ def main(argv=None):
             config=session_config,
             scaffold=init_scaffold
         )
-
+        
         # with sv.managed_session(config=session_config) as sess:
         #     step = sess.run(global_step)
         #     while step < FLAGS.max_num_steps:
