@@ -170,10 +170,10 @@ def main(argv=None):
     with tf.Graph().as_default():
         global_step = tf.train.get_or_create_global_step()
         
-        image,width,label = _get_input()
+        image, width, label = _get_input()
 
         with tf.device(FLAGS.train_device):
-            features,sequence_length = model.convnet_layers( image, width, mode)
+            features, sequence_length = model.convnet_layers( image, width, mode)
             logits = model.rnn_layers( features, sequence_length,
                                        mjsynth.num_classes() )
             train_op = _get_training(logits,label,sequence_length)
@@ -184,24 +184,60 @@ def main(argv=None):
         init_op = tf.group( tf.global_variables_initializer(),
                             tf.local_variables_initializer()) 
 
-        sv = tf.train.Supervisor(
-            logdir=FLAGS.output,
+        # sv = tf.train.Supervisor(
+        #     logdir=FLAGS.output,             Optional path to a directory where to checkpoint the model and log events for the visualizer. Used by chief supervisors.
+        #     init_op=init_op,                 Used by chief supervisors to initialize the model when it can not be recovered. Defaults to an Operation that initializes all global variables.
+        #     summary_op=summary_op,           An Operation that returns a Summary for the event logs. Used by chief supervisors if a logdir was specified.
+        #     save_summaries_secs=30,          Number of seconds between the computation of summaries for the event log. 
+        #     init_fn=_get_init_pretrained(),  Optional callable used to initialize the model. Called after the optional init_op is called. The callable must accept one argument, the session being initialized.
+        #     save_model_secs=150)             Number of seconds between the creation of model checkpoints.
+
+        # There are three hooks to maintain
+        #   summary
+        #   checkpoint
+        #   model
+        # I believe the verbage is saying that model == checkpoint, so I am seeing if checkpoint_hook
+        #   has all the functionality we need to reproduce supervisor in conjunction with summary_hook
+
+        init_scaffold = tf.train.Scaffold(
             init_op=init_op,
-            summary_op=summary_op,
-            save_summaries_secs=30,
-            init_fn=_get_init_pretrained(),
-            save_model_secs=150)
+            init_fn=_get_init_pretrained()
+        )
+        
+        saver_hook = tf.train.CheckpointSaverHook(
+            checkpoint_dir=FLAGS.output,
+            save_secs=150
+        )
 
+        summary_hook = tf.train.SummarySaverHook(
+            output_dir=FLAGS.output,
+            save_secs=30,
+            summary_op=summary_op
+        )
+        
+        monitor = tf.train.MonitoredTrainingSession(
+            hooks=[saver_hook, summary_hook],
+            config=session_config,
+            scaffold=init_scaffold
+        )
 
-        with sv.managed_session(config=session_config) as sess:
+        # with sv.managed_session(config=session_config) as sess:
+        #     step = sess.run(global_step)
+        #     while step < FLAGS.max_num_steps:
+        #         if sv.should_stop():
+        #             break                    
+        #         [step_loss,step]=sess.run([train_op,global_step])
+        #     sv.saver.save( sess, os.path.join(FLAGS.output,'model.ckpt'),
+        #                    global_step=global_step)
+
+        with monitor as sess:
             step = sess.run(global_step)
             while step < FLAGS.max_num_steps:
-                if sv.should_stop():
-                    break                    
-                [step_loss,step]=sess.run([train_op,global_step])
-            sv.saver.save( sess, os.path.join(FLAGS.output,'model.ckpt'),
-                           global_step=global_step)
-
+                if monitor.should_stop():
+                    break
+                [step_loss, step]=sess.run([train_op, global_step])
+            monitor.saver.save( sess, os.path.join(FLAGS.output, 'model.ckpt'),
+                                global_step=global_step)
 
 if __name__ == '__main__':
     tf.app.run()
