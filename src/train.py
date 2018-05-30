@@ -184,14 +184,6 @@ def main(argv=None):
         init_op = tf.group( tf.global_variables_initializer(),
                             tf.local_variables_initializer()) 
 
-        # sv = tf.train.Supervisor(
-        #     logdir=FLAGS.output,             Optional path to a directory where to checkpoint the model and log events for the visualizer. Used by chief supervisors.
-        #     init_op=init_op,                 Used by chief supervisors to initialize the model when it can not be recovered. Defaults to an Operation that initializes all global variables.
-        #     summary_op=summary_op,           An Operation that returns a Summary for the event logs. Used by chief supervisors if a logdir was specified.
-        #     save_summaries_secs=30,          Number of seconds between the computation of summaries for the event log. 
-        #     init_fn=_get_init_pretrained(),  Optional callable used to initialize the model. Called after the optional init_op is called. The callable must accept one argument, the session being initialized.
-        #     save_model_secs=150)             Number of seconds between the creation of model checkpoints.
-
         # There are three hooks to maintain
         #   summary
         #   checkpoint
@@ -221,15 +213,6 @@ def main(argv=None):
             scaffold=init_scaffold
         )
         
-        # with sv.managed_session(config=session_config) as sess:
-        #     step = sess.run(global_step)
-        #     while step < FLAGS.max_num_steps:
-        #         if sv.should_stop():
-        #             break                    
-        #         [step_loss,step]=sess.run([train_op,global_step])
-        #     sv.saver.save( sess, os.path.join(FLAGS.output,'model.ckpt'),
-        #                    global_step=global_step)
-
         with monitor as sess:
             step = sess.run(global_step)
             while step < FLAGS.max_num_steps:
@@ -238,6 +221,25 @@ def main(argv=None):
                 [step_loss, step]=sess.run([train_op, global_step])
             monitor.saver.save( sess, os.path.join(FLAGS.output, 'model.ckpt'),
                                 global_step=global_step)
+
+        """
+        sv = tf.train.Supervisor(
+            logdir=FLAGS.output,             # Optional path to a directory where to checkpoint the model and log events for the visualizer. Used by chief supervisors.
+            init_op=init_op,                 # Used by chief supervisors to initialize the model when it can not be recovered. Defaults to an Operation that initializes all global variables.
+            summary_op=summary_op,           # An Operation that returns a Summary for the event logs. Used by chief supervisors if a logdir was specified.
+            save_summaries_secs=30,          # Number of seconds between the computation of summaries for the event log. 
+            init_fn=_get_init_pretrained(),  # Optional callable used to initialize the model. Called after the optional init_op is called. The callable must accept one argument, the session being initialized.
+            save_model_secs=150)             # Number of seconds between the creation of model checkpoints.
+
+        with sv.managed_session(config=session_config) as sess:
+            step = sess.run(global_step)
+            while step < FLAGS.max_num_steps:
+                if sv.should_stop():
+                    break                    
+                [step_loss,step]=sess.run([train_op,global_step])
+            sv.saver.save( sess, os.path.join(FLAGS.output,'model.ckpt'),
+                           global_step=global_step)
+        """
 
 if __name__ == '__main__':
     tf.app.run()
