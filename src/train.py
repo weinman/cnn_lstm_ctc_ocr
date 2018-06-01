@@ -21,7 +21,6 @@ from tensorflow.contrib import learn
 import mjsynth
 import model
 
-
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string('output','../data/model',
@@ -151,7 +150,7 @@ def _get_session_config():
 
 def _get_init_pretrained():
     """Return lambda for reading pretrained initial model"""
-
+    
     if not FLAGS.tune_from:
         return None
     
@@ -163,7 +162,6 @@ def _get_init_pretrained():
     init_fn = lambda sess: saver_reader.restore(sess, ckpt_path)
 
     return init_fn
-
 
 def main(argv=None):
 
@@ -182,7 +180,7 @@ def main(argv=None):
 
         summary_op = tf.summary.merge_all()
         init_op = tf.group( tf.global_variables_initializer(),
-                            tf.local_variables_initializer()) 
+                            tf.local_variables_initializer())
 
         # There are three hooks to maintain
         #   summary
@@ -195,11 +193,6 @@ def main(argv=None):
             init_op=init_op,
             init_fn=_get_init_pretrained()
         )
-        
-        saver_hook = tf.train.CheckpointSaverHook(
-            checkpoint_dir=FLAGS.output,
-            save_secs=150
-        )
 
         summary_hook = tf.train.SummarySaverHook(
             output_dir=FLAGS.output,
@@ -208,7 +201,9 @@ def main(argv=None):
         )
         
         monitor = tf.train.MonitoredTrainingSession(
-            hooks=[saver_hook, summary_hook],
+            checkpoint_dir=FLAGS.output,
+            save_checkpoint_secs=150,
+            hooks=[summary_hook],
             config=session_config,
             scaffold=init_scaffold
         )
@@ -221,7 +216,7 @@ def main(argv=None):
                 [step_loss, step]=sess.run([train_op, global_step])
             monitor.saver.save( sess, os.path.join(FLAGS.output, 'model.ckpt'),
                                 global_step=global_step)
-
+        
         """
         sv = tf.train.Supervisor(
             logdir=FLAGS.output,             # Optional path to a directory where to checkpoint the model and log events for the visualizer. Used by chief supervisors.
