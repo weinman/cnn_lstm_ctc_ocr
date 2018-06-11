@@ -199,11 +199,18 @@ def main(argv=None):
             save_secs=30,
             summary_op=summary_op
         )
+
+        checkpoint_hook = tf.train.CheckpointSaverHook(
+            checkpoint_dir=FLAGS.output,
+            save_secs=150,
+            saver=tf.train.Saver(
+                tf.get_collection(tf.GraphKeys.GLOBAL_STEP)),
+            checkpoint_basename='model.ckpt'
+        )
         
         monitor = tf.train.MonitoredTrainingSession(
-            checkpoint_dir=FLAGS.output, # Necessary to save and restore
-            save_checkpoint_secs=150,
-            hooks=[summary_hook],        # Only this hook is necessary
+            checkpoint_dir=FLAGS.output, # Necessary to restore
+            hooks=[summary_hook, checkpoint_hook],
             config=session_config,
             scaffold=init_scaffold       # Scaffold initializes session
         )
@@ -214,6 +221,7 @@ def main(argv=None):
                 if monitor.should_stop():
                     break
                 [step_loss, step]=sess.run([train_op, global_step])
+                # montor.saver.save takes sess as an argument with monitor as sess? 
             monitor.saver.save( sess, os.path.join(FLAGS.output, 'model.ckpt'),
                                 global_step=global_step)
         
