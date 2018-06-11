@@ -201,11 +201,11 @@ def main(argv=None):
         )
         
         monitor = tf.train.MonitoredTrainingSession(
-            checkpoint_dir=FLAGS.output,
+            checkpoint_dir=FLAGS.output, # Necessary to save and restore
             save_checkpoint_secs=150,
-            hooks=[summary_hook],
+            hooks=[summary_hook],        # Only this hook is necessary
             config=session_config,
-            scaffold=init_scaffold
+            scaffold=init_scaffold       # Scaffold initializes session
         )
         
         with monitor as sess:
