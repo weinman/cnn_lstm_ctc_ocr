@@ -41,7 +41,7 @@ tf.app.flags.DEFINE_float('decay_rate',0.9,
                           """Learning rate decay base""")
 tf.app.flags.DEFINE_float('decay_steps',2**16,
                           """Learning rate decay exponent scale""")
-tf.app.flags.DEFINE_float('decay_staircase',False,
+tf.app.flags.DEFINE_bool('decay_staircase',False,
                           """Staircase learning rate decay by integer division""")
 
 
