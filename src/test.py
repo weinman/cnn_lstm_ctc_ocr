@@ -109,6 +109,7 @@ def _get_checkpoint():
 
     if ckpt and ckpt.model_checkpoint_path:
         ckpt_path=ckpt.model_checkpoint_path
+        print "Restoring model: {}".format(ckpt_path)
     else:
         raise RuntimeError('No checkpoint file found')
 
@@ -122,7 +123,6 @@ def _get_init_trained():
     
     init_fn = lambda sess,ckpt_path: saver_reader.restore(sess, ckpt_path)
     return init_fn
-
 
 def main(argv=None):
 
@@ -161,8 +161,8 @@ def main(argv=None):
 
             try:            
                 while True:
-                    restore_model(sess, _get_checkpoint()) # Get latest checkpoint
-
+                    restore_model(sess, _get_checkpoint()) # Get latest checkpoint           
+                    
                     if not coord.should_stop():
                         step_vals = sess.run(step_ops)
                         print step_vals
@@ -172,7 +172,7 @@ def main(argv=None):
                         break
                     time.sleep(FLAGS.test_interval_secs)
             except tf.errors.OutOfRangeError:
-                    print('Done')
+                print('Done')
             finally:
                 coord.request_stop()
         coord.join(threads)

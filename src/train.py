@@ -164,9 +164,11 @@ def _get_init_pretrained():
     return init_fn
 
 def main(argv=None):
-
+    
     with tf.Graph().as_default():
         global_step = tf.train.get_or_create_global_step()
+
+        print tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
         
         image, width, label = _get_input()
 
