@@ -84,6 +84,7 @@ def _get_input():
     #tf.summary.image('images',image) # Uncomment to see images in TensorBoard
     return image,width,label
 
+
 def _get_single_input():
     """Set up and return image, label, and width tensors"""
 
@@ -96,6 +97,7 @@ def _get_single_input():
         batch_device=FLAGS.input_device, 
         preprocess_device=FLAGS.input_device )
     return image,width,label,length,text,filename
+
 
 def _get_training(rnn_logits,label,sequence_length):
     """Set up training ops"""
@@ -139,6 +141,7 @@ def _get_training(rnn_logits,label,sequence_length):
 
     return train_op
 
+
 def _get_session_config():
     """Setup session config to soften device placement"""
 
@@ -147,6 +150,7 @@ def _get_session_config():
         log_device_placement=False)
 
     return config
+
 
 def _get_init_pretrained():
     """Return lambda for reading pretrained initial model"""
@@ -163,12 +167,11 @@ def _get_init_pretrained():
 
     return init_fn
 
+
 def main(argv=None):
     
     with tf.Graph().as_default():
         global_step = tf.train.get_or_create_global_step()
-
-        print tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
         
         image, width, label = _get_input()
 
@@ -194,21 +197,10 @@ def main(argv=None):
             save_secs=30,
             summary_op=summary_op
         )
-
-        checkpoint_hook = tf.train.CheckpointSaverHook(
-            checkpoint_dir=FLAGS.output,
-            save_secs=150,
-            saver=tf.train.Saver(
-                tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-            ),
-            checkpoint_basename='model.ckpt'
-        )
         
         monitor = tf.train.MonitoredTrainingSession(
             checkpoint_dir=FLAGS.output, # Necessary to restore
-            save_checkpoint_secs=None,   # Both nones disable mts checkpoint saver
-            save_checkpoint_steps=None,
-            hooks=[summary_hook, checkpoint_hook],
+            hooks=[summary_hook],
             config=session_config,
             scaffold=init_scaffold       # Scaffold initializes session
         )
@@ -219,10 +211,9 @@ def main(argv=None):
                 if monitor.should_stop():
                     break
                 [step_loss, step]=sess.run([train_op, global_step])
-                # montor.saver.save takes sess as an argument with monitor as sess? 
             monitor.saver.save( sess, os.path.join(FLAGS.output, 'model.ckpt'),
                                 global_step=global_step)
-        
+
 
 if __name__ == '__main__':
     tf.app.run()
