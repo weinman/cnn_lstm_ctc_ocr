@@ -135,7 +135,7 @@ def main(argv=None):
             loss,label_error,sequence_error = _get_testing(
                 logits,sequence_length,label,length)
 
-        global_step = tf.train.get_or_create_global_step()        
+        global_step = tf.train.get_or_create_global_step()
 
         session_config = _get_session_config()
         restore_model = _get_init_trained()
@@ -160,7 +160,7 @@ def main(argv=None):
 
             try:            
                 while True:
-                    restore_model(sess, _get_checkpoint()) # Get latest checkpoint           
+                    restore_model(sess, _get_checkpoint()) # Get latest checkpoint
                     
                     if not coord.should_stop():
                         step_vals = sess.run(step_ops)
