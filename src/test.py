@@ -109,7 +109,6 @@ def _get_checkpoint():
 
     if ckpt and ckpt.model_checkpoint_path:
         ckpt_path=ckpt.model_checkpoint_path
-        print "Restoring model: {}".format(ckpt_path)
     else:
         raise RuntimeError('No checkpoint file found')
 
