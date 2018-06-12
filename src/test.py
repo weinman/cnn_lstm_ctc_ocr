@@ -117,7 +117,6 @@ def _get_checkpoint():
 def _get_init_trained():
     """Return init function to restore trained model from a given checkpoint"""
     saver_reader = tf.train.Saver(
-        tf.get_collection(tf.GraphKeys.GLOBAL_STEP) + 
         tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
     )
     
@@ -137,11 +136,11 @@ def main(argv=None):
             loss,label_error,sequence_error = _get_testing(
                 logits,sequence_length,label,length)
 
-        global_step = tf.train.get_global_step()
+        global_step = tf.train.get_or_create_global_step()        
 
         session_config = _get_session_config()
         restore_model = _get_init_trained()
-        
+
         summary_op = tf.summary.merge_all()
         init_op = tf.group( tf.global_variables_initializer(),
                             tf.local_variables_initializer()) 
@@ -149,8 +148,7 @@ def main(argv=None):
         summary_writer = tf.summary.FileWriter( os.path.join(FLAGS.model,
                                                             FLAGS.output) )
 
-        #step_ops = [global_step, loss, label_error, sequence_error]
-        step_ops = [loss, label_error, sequence_error]
+        step_ops = [global_step, loss, label_error, sequence_error]
 
         with tf.Session(config=session_config) as sess:
             
