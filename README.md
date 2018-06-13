@@ -8,7 +8,8 @@ adaptation of Shi et al.'s CRNN architecture
 downloads and trains using Jaderberg et al.'s synthetic data ([IJCV
 2016](http://dx.doi.org/10.1007/s11263-015-0823-z)).
 
-Developed for Tensorflow 1.1
+Currently updated for TensorFlow 1.8
+Developed in TensorFlow 1.1
 
 
 # Structure
@@ -51,7 +52,7 @@ rate decay.
 # Training
 
 To completely train the model, you will need to download the mjsynth
-dataset, pack it into sharded tensorflow records. Then you can start
+dataset and pack it into sharded TensorFlow records. Then you can start
 the training process, a tensorboard monitor, and an ongoing evaluation
 thread. The individual commands are packaged in the accompanying `Makefile`.
 
@@ -75,14 +76,14 @@ error is just over 20%.
 
 With the full training data, by one million iterations the model
 typically converges to around 7% training character error and 35% word
-error, both varying by 2-5%.
+error, both varying by 2–5%.
 
 # Testing
 
 The test script streams statistics for small batches of validation (or test)
 data. It prints the iteration, test batch loss, label error (percentage of
 characters predicted incorrectly), and the sequence error (percentage of
-words--entire sequences--predicted incorrectly.)
+words—entire sequences—predicted incorrectly.)
 
 # Validation
 
