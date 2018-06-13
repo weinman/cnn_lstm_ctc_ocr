@@ -21,7 +21,6 @@ from tensorflow.contrib import learn
 import mjsynth
 import model
 
-
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string('output','../data/model',
@@ -85,6 +84,7 @@ def _get_input():
     #tf.summary.image('images',image) # Uncomment to see images in TensorBoard
     return image,width,label
 
+
 def _get_single_input():
     """Set up and return image, label, and width tensors"""
 
@@ -97,6 +97,7 @@ def _get_single_input():
         batch_device=FLAGS.input_device, 
         preprocess_device=FLAGS.input_device )
     return image,width,label,length,text,filename
+
 
 def _get_training(rnn_logits,label,sequence_length):
     """Set up training ops"""
@@ -140,6 +141,7 @@ def _get_training(rnn_logits,label,sequence_length):
 
     return train_op
 
+
 def _get_session_config():
     """Setup session config to soften device placement"""
 
@@ -149,15 +151,16 @@ def _get_session_config():
 
     return config
 
+
 def _get_init_pretrained():
     """Return lambda for reading pretrained initial model"""
-
+    
     if not FLAGS.tune_from:
         return None
     
     saver_reader = tf.train.Saver(
         tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
-
+    
     ckpt_path=FLAGS.tune_from
 
     init_fn = lambda sess: saver_reader.restore(sess, ckpt_path)
@@ -166,14 +169,14 @@ def _get_init_pretrained():
 
 
 def main(argv=None):
-
+    
     with tf.Graph().as_default():
         global_step = tf.train.get_or_create_global_step()
         
-        image,width,label = _get_input()
+        image, width, label = _get_input()
 
         with tf.device(FLAGS.train_device):
-            features,sequence_length = model.convnet_layers( image, width, mode)
+            features, sequence_length = model.convnet_layers( image, width, mode)
             logits = model.rnn_layers( features, sequence_length,
                                        mjsynth.num_classes() )
             train_op = _get_training(logits,label,sequence_length)
@@ -182,25 +185,34 @@ def main(argv=None):
 
         summary_op = tf.summary.merge_all()
         init_op = tf.group( tf.global_variables_initializer(),
-                            tf.local_variables_initializer()) 
+                            tf.local_variables_initializer())
 
-        sv = tf.train.Supervisor(
-            logdir=FLAGS.output,
+        init_scaffold = tf.train.Scaffold(
             init_op=init_op,
-            summary_op=summary_op,
-            save_summaries_secs=30,
-            init_fn=_get_init_pretrained(),
-            save_model_secs=150)
+            init_fn=_get_init_pretrained()
+        )
 
-
-        with sv.managed_session(config=session_config) as sess:
+        summary_hook = tf.train.SummarySaverHook(
+            output_dir=FLAGS.output,
+            save_secs=30,
+            summary_op=summary_op
+        )
+        
+        monitor = tf.train.MonitoredTrainingSession(
+            checkpoint_dir=FLAGS.output, # Necessary to restore
+            hooks=[summary_hook],
+            config=session_config,
+            scaffold=init_scaffold       # Scaffold initializes session
+        )
+        
+        with monitor as sess:
             step = sess.run(global_step)
             while step < FLAGS.max_num_steps:
-                if sv.should_stop():
-                    break                    
-                [step_loss,step]=sess.run([train_op,global_step])
-            sv.saver.save( sess, os.path.join(FLAGS.output,'model.ckpt'),
-                           global_step=global_step)
+                if monitor.should_stop():
+                    break
+                [step_loss, step]=sess.run([train_op, global_step])
+            monitor.saver.save( sess, os.path.join(FLAGS.output, 'model.ckpt'),
+                                global_step=global_step)
 
 
 if __name__ == '__main__':
