@@ -176,7 +176,7 @@ def main(argv=None):
         image, width, label = _get_input()
 
         with tf.device(FLAGS.train_device):
-            features, sequence_length = model.convnet_layers( image, width, mode)
+            features,sequence_length = model.convnet_layers( image, width, mode)
             logits = model.rnn_layers( features, sequence_length,
                                        mjsynth.num_classes() )
             train_op = _get_training(logits,label,sequence_length)
@@ -210,7 +210,7 @@ def main(argv=None):
             while step < FLAGS.max_num_steps:
                 if monitor.should_stop():
                     break
-                [step_loss, step]=sess.run([train_op, global_step])
+                [step_loss,step]=sess.run([train_op, global_step])
             monitor.saver.save( sess, os.path.join(FLAGS.output, 'model.ckpt'),
                                 global_step=global_step)
 
