@@ -198,9 +198,14 @@ def main(argv=None):
             summary_op=summary_op
         )
         
+        saver_hook = tf.train.CheckpointSaverHook(
+            checkpoint_dir=FLAGS.output,
+            save_secs=150
+        )
+
         monitor = tf.train.MonitoredTrainingSession(
             checkpoint_dir=FLAGS.output, # Necessary to restore
-            hooks=[summary_hook],
+            hooks=[summary_hook,saver_hook],
             config=session_config,
             scaffold=init_scaffold       # Scaffold initializes session
         )
