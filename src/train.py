@@ -72,7 +72,7 @@ mode = learn.ModeKeys.TRAIN # 'Configure' training mode for dropout layers
 def _get_input():
     """Set up and return image, label, and image width tensors"""
 
-    image,width,label,_,_,_=mjsynth.bucketed_input_pipeline(
+    dataset=mjsynth.bucketed_input_pipeline(
         FLAGS.train_path, 
         str.split(FLAGS.filename_pattern,','),
         batch_size=FLAGS.batch_size,
@@ -80,12 +80,15 @@ def _get_input():
         input_device=FLAGS.input_device,
         width_threshold=FLAGS.width_threshold,
         length_threshold=FLAGS.length_threshold )
-
+    
+    iterator = make_one_shot_iterator() #TODO CHANGE THIS TO REINITIALIZABLE ITERATOR!!!!!!!!!!!
     #tf.summary.image('images',image) # Uncomment to see images in TensorBoard
-    return image,width,label
+    while True:
+        yield iterator.get_next(dataset) #image,width,label
 
 
 def _get_single_input():
+    
     """Set up and return image, label, and width tensors"""
 
     image,width,label,length,text,filename=mjsynth.threaded_input_pipeline(
