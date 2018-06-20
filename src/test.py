@@ -53,14 +53,16 @@ mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
 def _get_input():
     """Set up and return image, label, width and text tensors"""
 
-    image,width,label,length,text,filename=mjsynth.threaded_input_pipeline(
+    dataset=mjsynth.threaded_input_pipeline(
         FLAGS.test_path,
         str.split(FLAGS.filename_pattern,','),
         batch_size=FLAGS.batch_size,
         num_threads=FLAGS.num_input_threads,
-        num_epochs=None, # Repeat for streaming
         batch_device=FLAGS.device, 
         preprocess_device=FLAGS.device )
+    
+    iterator = dataset.make_one_shot_iterator()
+    image, width, label, length, _, _ = iterator.get_next()
     
     return image,width,label,length
 
@@ -153,8 +155,8 @@ def main(argv=None):
             
             sess.run(init_op)
 
-            coord = tf.train.Coordinator() # Launch reader threads
-            threads = tf.train.start_queue_runners(sess=sess,coord=coord)
+            #coord = tf.train.Coordinator() # Launch reader threads
+            #threads = tf.train.start_queue_runners(sess=sess,coord=coord)
             
             summary_writer.add_graph(sess.graph)
 
@@ -162,19 +164,18 @@ def main(argv=None):
                 while True:
                     restore_model(sess, _get_checkpoint()) # Get latest checkpoint
                     
-                    if not coord.should_stop():
-                        step_vals = sess.run(step_ops)
-                        print step_vals
-                        summary_str = sess.run(summary_op)
-                        summary_writer.add_summary(summary_str,step_vals[0])
-                    else:
-                        break
-                    time.sleep(FLAGS.test_interval_secs)
+                    #if not coord.should_stop():
+                    step_vals = sess.run(step_ops)
+                    print step_vals
+                    summary_str = sess.run(summary_op)
+                    summary_writer.add_summary(summary_str,step_vals[0])
+                   # else:
+                    #    break
+                    #time.sleep(FLAGS.test_interval_secs)
             except tf.errors.OutOfRangeError:
                 print('Done')
-            finally:
-                coord.request_stop()
-        coord.join(threads)
+            #finally:
+            #    coord.request_stop()
 
 if __name__ == '__main__':
     tf.app.run()

@@ -94,7 +94,14 @@ def threaded_input_pipeline(base_dir,file_patterns,
     
     with tf.device(batch_device): # Create batch queue
 
-        dataset = dataset.batch(batch_size)
+        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length
+                                (element_length_func=_element_length_fn,
+                                 bucket_batch_sizes=np.full
+                                 (len([32, 64, 96, 128, 160, 192, 224, 256]) + 1, batch_size),
+                                 bucket_boundaries=[32, 64, 96, 128, 160, 192, 224, 256]))
+        
+
+        #dataset = dataset.padded_batch(batch_size, )
 
         dataset = dataset.map(lambda image, 
                               width, label, 
@@ -106,7 +113,7 @@ def threaded_input_pipeline(base_dir,file_patterns,
 
     return dataset
 
-def _element_length_fn(image, width, label, length, text, filename, get_input):
+def _element_length_fn(image, width, label, length, text, filename):
     return width
 
 def _get_input_filter(width, width_threshold, length, length_threshold):
