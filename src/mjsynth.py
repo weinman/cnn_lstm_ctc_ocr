@@ -32,7 +32,8 @@ def bucketed_input_pipeline(base_dir,file_patterns,
                             boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
                             input_device=None,
                             width_threshold=None,
-                            length_threshold=None):
+                            length_threshold=None,
+                            num_epoch=None):
     """Get input tensors bucketed by image width
     Returns:
       image : float32 image tensor [batch_size 32 ? 1] padded to batch max width
@@ -48,11 +49,13 @@ def bucketed_input_pipeline(base_dir,file_patterns,
     with tf.device(input_device): # Create bucketing batcher
 
         training = True
-        data_tuples = []
 
         dataset = dataset.map(lambda element: _parse_function
-                              (element, width_threshold, length_threshold, training, data_tuples), 
-                              num_parallel_calls=num_threads)
+                              (element, 
+                               width_threshold, 
+                               length_threshold, 
+                               training, 
+                               data_tuples), num_parallel_calls=num_threads)
         
         dataset = dataset.filter(lambda image, 
                                  width, 
@@ -69,13 +72,18 @@ def bucketed_input_pipeline(base_dir,file_patterns,
                                  (len(boundaries) + 1, batch_size),
                                  bucket_boundaries=boundaries))
 
-        iterator = dataset.make_one_shot_iterator()
-        image, width, label, length, text, filename, get_input = iterator.get_next()
+        dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(batch_size, 
+                                                                   count=num_epoch))
 
-        label = tf.deserialize_many_sparse(label, tf.int64) # post-batching...
-        label = tf.cast(label, tf.int32) # for ctc_loss
-        
-    return image, width, label, length, text, filename
+        dataset = dataset.map(lambda image, 
+                              width, label, 
+                              length, text, 
+                              filename, get_input: 
+                              (image, width, 
+                              tf.cast(tf.deserialize_many_sparse(label, tf.int64), tf.int32),
+                              length, text, filename, get_input))
+
+    return dataset
 
 def threaded_input_pipeline(base_dir,file_patterns,
                             num_threads=4,
@@ -84,40 +92,35 @@ def threaded_input_pipeline(base_dir,file_patterns,
                             preprocess_device=None,
                             num_epochs=None):
 
-    queue_capacity = num_threads*batch_size*2
-    # Allow a smaller final batch if we are going for a fixed number of epochs
-    final_batch = (num_epochs!=None)
-
     training = False
     width_threshold = None
     length_threshold = None
 
     dataset = _get_dataset(base_dir, file_patterns)
 
-    # each thread has a subgraph with its own reader (sharing filename queue)
-    data_tuples = [] # list of subgraph [image, label, width, text] elements
     with tf.device(preprocess_device):
             
         dataset = dataset.map(lambda element: _parse_function
                               (element, 
                                width_threshold, 
                                length_threshold, 
-                               training, data_tuples))
-
-    iterator = dataset.make_one_shot_iterator()
-    image, width, label, length, text, filename = iterator.get_next()
-            
+                               training, 
+                               data_tuples),
+                              num_parallel_calls=num_threads)
+    
     with tf.device(batch_device): # Create batch queue
 
-        image, width, label, length, text, filename  = tf.train.batch_join( 
-            data_tuples, 
-            batch_size=batch_size,
-            capacity=queue_capacity,
-            allow_smaller_final_batch=final_batch,
-            dynamic_pad=True)
-        label = tf.deserialize_many_sparse(label, tf.int64) # post-batching...
-        label = tf.cast(label, tf.int32) # for ctc_loss
-    return image, width, label, length, text, filename
+        dataset = dataset.batch(batch_size)
+
+        dataset = dataset.map(lambda image, 
+                              width, label, 
+                              length, text, 
+                              filename: 
+                              (image, width, 
+                              tf.cast(tf.deserialize_many_sparse(label, tf.int64), tf.int32),
+                              length, text, filename))
+
+    return dataset
 
 def _element_length_fn(image, width, label, length, text, filename, get_input):
     return width
