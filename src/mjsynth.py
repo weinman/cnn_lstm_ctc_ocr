@@ -48,10 +48,7 @@ def bucketed_input_pipeline(base_dir,file_patterns,
 
     with tf.device(input_device): # Create bucketing batcher
 
-        training = True
-
-        dataset = dataset.map(lambda element: 
-                              (_parse_function(element, training)), 
+        dataset = dataset.map(_parse_function, 
                               num_parallel_calls=num_threads)
         
         dataset = dataset.filter(lambda image, 
@@ -88,19 +85,11 @@ def threaded_input_pipeline(base_dir,file_patterns,
                             batch_device=None,
                             preprocess_device=None):
 
-    training = False
-    width_threshold = None
-    length_threshold = None
-
     dataset = _get_dataset(base_dir, file_patterns)
 
     with tf.device(preprocess_device):
             
-        dataset = dataset.map(lambda element: _parse_function
-                              (element, 
-                               width_threshold, 
-                               length_threshold, 
-                               training),
+        dataset = dataset.map(_parse_function,
                               num_parallel_calls=num_threads)
     
     with tf.device(batch_device): # Create batch queue
@@ -168,7 +157,7 @@ def _get_dataset(base_dir, file_patterns=['*.tfrecord']):
     return dataset
 
 # https://www.tensorflow.org/programmers_guide/datasets#consuming_tfrecord_data
-def _parse_function(data, width_threshold, length_threshold, training):
+def _parse_function(data):
     """Parse the elements of the dataset"""
 
     feature_map = {
@@ -184,9 +173,10 @@ def _parse_function(data, width_threshold, length_threshold, training):
         'text/length':    tf.FixedLenFeature( [1], dtype=tf.int64,
                                               default_value=1 )
     }
-
+    
     features = tf.parse_single_example(data, feature_map)
-
+    
+    # Initialize fields according to feature map
     image = tf.image.decode_jpeg( features['image/encoded'], channels=1 ) #gray
     width = tf.cast( features['image/width'], tf.int32) # for ctc_loss
     label = tf.serialize_sparse( features['image/labels'] ) # for batching
@@ -194,17 +184,10 @@ def _parse_function(data, width_threshold, length_threshold, training):
     text = features['text/string']
     filename = features['image/filename']
 
-    #Check if input meets a specified standard
-    if training:
-        keep_input = _get_input_filter(width, width_threshold,
-                                       length, length_threshold)
-        image = _preprocess_image(image)
-        return image,width,label,length,text,filename
-    else:
-        image = _preprocess_image(image)
-        return image,width,label,length,text,filename
+    # Prepare image
+    image = _preprocess_image(image)
 
-    return None
+    return image,width,label,length,text,filename
 
 def _preprocess_image(image):
     # Rescale from uint8([0,255]) to float([-0.5,0.5])
