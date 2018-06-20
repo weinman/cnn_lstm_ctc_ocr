@@ -54,8 +54,7 @@ def bucketed_input_pipeline(base_dir,file_patterns,
                               (element, 
                                width_threshold, 
                                length_threshold, 
-                               training, 
-                               data_tuples), num_parallel_calls=num_threads)
+                               training), num_parallel_calls=num_threads)
         
         dataset = dataset.filter(lambda image, 
                                  width, 
@@ -71,7 +70,7 @@ def bucketed_input_pipeline(base_dir,file_patterns,
                                  bucket_batch_sizes=np.full
                                  (len(boundaries) + 1, batch_size),
                                  bucket_boundaries=boundaries))
-
+        #TODO potentially add a prefetch after batching (of 1)
         dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(batch_size, 
                                                                    count=num_epoch))
 
@@ -89,8 +88,7 @@ def threaded_input_pipeline(base_dir,file_patterns,
                             num_threads=4,
                             batch_size=32,
                             batch_device=None,
-                            preprocess_device=None,
-                            num_epochs=None):
+                            preprocess_device=None):
 
     training = False
     width_threshold = None
@@ -104,8 +102,7 @@ def threaded_input_pipeline(base_dir,file_patterns,
                               (element, 
                                width_threshold, 
                                length_threshold, 
-                               training, 
-                               data_tuples),
+                               training),
                               num_parallel_calls=num_threads)
     
     with tf.device(batch_device): # Create batch queue
@@ -173,7 +170,7 @@ def _get_dataset(base_dir, file_patterns=['*.tfrecord']):
     return dataset
 
 # https://www.tensorflow.org/programmers_guide/datasets#consuming_tfrecord_data
-def _parse_function(data, width_threshold, length_threshold, training, data_tuple):
+def _parse_function(data, width_threshold, length_threshold, training):
     """Parse the elements of the dataset"""
 
     feature_map = {
@@ -203,12 +200,11 @@ def _parse_function(data, width_threshold, length_threshold, training, data_tupl
     if training:
         keep_input = _get_input_filter(width, width_threshold,
                                        length, length_threshold)
-        image = features['image/encoded'] = _preprocess_image(image)
-        return image,width,label,length,text,filename,keep_input
+        image = _preprocess_image(image)
+        return image,width,label,length,text,filename
     else:
         image = _preprocess_image(image)
-        data_tuple.append([image,width,label,length,text,filename])
-        return features['image/encoded'],width,label,length,text,filename
+        return image,width,label,length,text,filename
 
     return None
 
