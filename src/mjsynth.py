@@ -50,20 +50,18 @@ def bucketed_input_pipeline(base_dir,file_patterns,
 
         training = True
 
-        dataset = dataset.map(lambda element: _parse_function
-                              (element, 
-                               width_threshold, 
-                               length_threshold, 
-                               training), num_parallel_calls=num_threads)
+        dataset = dataset.map(lambda element: 
+                              (_parse_function(element, training)), 
+                              num_parallel_calls=num_threads)
         
         dataset = dataset.filter(lambda image, 
                                  width, 
                                  label, 
                                  length, 
                                  text, 
-                                 filename, 
-                                 get_input: 
-                                 get_input != None)
+                                 filename:
+                                 _get_input_filter(width, width_threshhold,
+                                                   length, length_threshhold))
 
         dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length
                                 (element_length_func=_element_length_fn,
