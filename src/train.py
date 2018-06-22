@@ -18,7 +18,7 @@ import os
 import tensorflow as tf
 from tensorflow.contrib import learn
 
-import mjsynth
+import dynmj
 import model
 
 FLAGS = tf.app.flags.FLAGS
@@ -69,38 +69,30 @@ tf.logging.set_verbosity(tf.logging.INFO)
 optimizer='Adam'
 mode = learn.ModeKeys.TRAIN # 'Configure' training mode for dropout layers
 
-def _get_input():
+def _get_input_stream():
     """Set up and return image, label, and image width tensors"""
 
-    dataset=mjsynth.bucketed_input_pipeline(
-        FLAGS.train_path, 
-        str.split(FLAGS.filename_pattern,','),
+    dataset=dynmj.bucketed_input_pipeline(
         batch_size=FLAGS.batch_size,
         num_threads=FLAGS.num_input_threads,
         input_device=FLAGS.input_device,
         width_threshold=FLAGS.width_threshold,
         length_threshold=FLAGS.length_threshold )
-    
-    iterator = dataset.make_one_shot_iterator() 
-    #tf.summary.image('images',image) # Uncomment to see images in TensorBoard
-    while True:
-        image, width, label, _, _ = iterator.get_next()
-        yield image, width, label
+
+    return dataset.make_one_shot_iterator() 
 
 
-def _get_single_input():
-    
+def _get_single_input_stream():    
     """Set up and return image, label, and width tensors"""
 
-    image,width,label,length,text,filename=mjsynth.threaded_input_pipeline(
-        deps.get('records'), 
-        str.split(FLAGS.filename_pattern,','),
+    dataset=dynmj.threaded_input_pipeline(
         batch_size=1,
         num_threads=FLAGS.num_input_threads,
         num_epochs=1,
         batch_device=FLAGS.input_device, 
         preprocess_device=FLAGS.input_device )
-    return image,width,label,length,text
+
+    return dataset.make_one_shot_iterator()
 
 
 def _get_training(rnn_logits,label,sequence_length):
@@ -173,15 +165,21 @@ def _get_init_pretrained():
 
 
 def main(argv=None):
-    iter = _get_input()
+    
+    
+    
     with tf.Graph().as_default():
         global_step = tf.train.get_or_create_global_step()
+
+        input_stream = _get_input_stream()
         
-        image, width, label = next(iter)
+        # Grab the next batch of data from input_stream 
+        image, width, label, _, _ = input_stream.get_next()
+
         with tf.device(FLAGS.train_device):
             features,sequence_length = model.convnet_layers( image, width, mode)
             logits = model.rnn_layers( features, sequence_length,
-                                       mjsynth.num_classes() )
+                                       dynmj.num_classes() )
             train_op = _get_training(logits,label,sequence_length)
 
         session_config = _get_session_config()

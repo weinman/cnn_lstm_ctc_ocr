@@ -19,7 +19,7 @@ import time
 import tensorflow as tf
 from tensorflow.contrib import learn
 import cv2
-import mjsynth
+import dynmj
 import model
 
 FLAGS = tf.app.flags.FLAGS
@@ -49,21 +49,16 @@ tf.logging.set_verbosity(tf.logging.WARN)
 # Non-configurable parameters
 mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
 
-
-def _get_input():
+def _get_input_stream():
     """Set up and return image, label, width and text tensors"""
 
-    dataset=mjsynth.threaded_input_pipeline(
-        FLAGS.test_path,
-        str.split(FLAGS.filename_pattern,','),
+    dataset=dynmj.threaded_input_pipeline(
         batch_size=FLAGS.batch_size,
         num_threads=FLAGS.num_input_threads,
         batch_device=FLAGS.device, 
-        preprocess_device=FLAGS.device )
-    iterator = dataset.make_one_shot_iterator()
-    while True:
-        image, width, label, length, _ = iterator.get_next()
-        yield image, width, label, length
+        preprocess_device=FLAGS.device)
+
+    return dataset.make_one_shot_iterator()
 
 
 def _get_session_config():
@@ -126,15 +121,18 @@ def _get_init_trained():
     return init_fn
 
 def main(argv=None):
+    
 
-    iter = _get_input()
     with tf.Graph().as_default():
-        image,width,label,length = next(iter)
+        input_stream = _get_input_stream()
+
+        # Get the next batch
+        image,width,label,length, _ = input_stream.get_next()
 
         with tf.device(FLAGS.device):
             features,sequence_length = model.convnet_layers( image, width, mode)
             logits = model.rnn_layers( features, sequence_length,
-                                       mjsynth.num_classes() )
+                                       dynmj.num_classes() )
             loss,label_error,sequence_error = _get_testing(
                 logits,sequence_length,label,length)
 
@@ -155,10 +153,6 @@ def main(argv=None):
         with tf.Session(config=session_config) as sess:
             
             sess.run(init_op)
-
-            #coord = tf.train.Coordinator() # Launch reader threads
-            #threads = tf.train.start_queue_runners(sess=sess,coord=coord)
-            
             summary_writer.add_graph(sess.graph)
 
             try:            

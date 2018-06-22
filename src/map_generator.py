@@ -101,9 +101,4 @@ if __name__=='__main__':
     #guiLoop()
     caption, map_generator=data_generator()
     next(map_generator)
-    next(map_generator)
-    next(map_generator)
-    next(map_generator)
-    next(map_generator)
-    next(map_generator)
-    next(map_generator)
+
