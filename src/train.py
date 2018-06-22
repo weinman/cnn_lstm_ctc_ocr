@@ -69,7 +69,7 @@ tf.logging.set_verbosity(tf.logging.INFO)
 optimizer='Adam'
 mode = learn.ModeKeys.TRAIN # 'Configure' training mode for dropout layers
 
-def _get_input():
+def _get_input_stream():
     """Set up and return image, label, and image width tensors"""
 
     dataset=mjsynth.bucketed_input_pipeline(
@@ -81,17 +81,14 @@ def _get_input():
         width_threshold=FLAGS.width_threshold,
         length_threshold=FLAGS.length_threshold )
     
-    iterator = make_one_shot_iterator() #TODO CHANGE THIS TO REINITIALIZABLE ITERATOR!!!!!!!!!!!
-    #tf.summary.image('images',image) # Uncomment to see images in TensorBoard
-    while True:
-        yield iterator.get_next(dataset) #image,width,label
+    return dataset.make_one_shot_iterator()
 
 
-def _get_single_input():
+def _get_single_input_stream():
     
     """Set up and return image, label, and width tensors"""
 
-    image,width,label,length,text,filename=mjsynth.threaded_input_pipeline(
+    dataset=mjsynth.threaded_input_pipeline(
         deps.get('records'), 
         str.split(FLAGS.filename_pattern,','),
         batch_size=1,
@@ -99,7 +96,8 @@ def _get_single_input():
         num_epochs=1,
         batch_device=FLAGS.input_device, 
         preprocess_device=FLAGS.input_device )
-    return image,width,label,length,text,filename
+
+    return dataset.make_one_shot_iterator()
 
 
 def _get_training(rnn_logits,label,sequence_length):
@@ -172,11 +170,11 @@ def _get_init_pretrained():
 
 
 def main(argv=None):
-    
+    input_stream = _get_input_stream()
     with tf.Graph().as_default():
         global_step = tf.train.get_or_create_global_step()
         
-        image, width, label = _get_input()
+        image, width, label, _, _, _ = input_stream.get_next()
 
         with tf.device(FLAGS.train_device):
             features,sequence_length = model.convnet_layers( image, width, mode)

@@ -50,7 +50,7 @@ tf.logging.set_verbosity(tf.logging.WARN)
 mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
 
 
-def _get_input():
+def _get_input_stream():
     """Set up and return image, label, width and text tensors"""
 
     dataset=mjsynth.threaded_input_pipeline(
@@ -61,10 +61,7 @@ def _get_input():
         batch_device=FLAGS.device, 
         preprocess_device=FLAGS.device )
     
-    iterator = dataset.make_one_shot_iterator()
-    image, width, label, length, _, _ = iterator.get_next()
-    
-    return image,width,label,length
+    return dataset.make_one_shot_iterator()
 
 def _get_session_config():
     """Setup session config to soften device placement"""
@@ -126,9 +123,9 @@ def _get_init_trained():
     return init_fn
 
 def main(argv=None):
-
+    input_stream = _get_input_stream()
     with tf.Graph().as_default():
-        image,width,label,length = _get_input()
+        image,width,label,length,_ = input_stream.get_next()
 
         with tf.device(FLAGS.device):
             features,sequence_length = model.convnet_layers( image, width, mode)
@@ -154,28 +151,21 @@ def main(argv=None):
         with tf.Session(config=session_config) as sess:
             
             sess.run(init_op)
-
-            #coord = tf.train.Coordinator() # Launch reader threads
-            #threads = tf.train.start_queue_runners(sess=sess,coord=coord)
-            
             summary_writer.add_graph(sess.graph)
 
             try:            
                 while True:
-                    restore_model(sess, _get_checkpoint()) # Get latest checkpoint
+                    # Get latest checkpoint
+                    restore_model(sess, _get_checkpoint()) 
                     
-                    #if not coord.should_stop():
                     step_vals = sess.run(step_ops)
                     print step_vals
+                    
                     summary_str = sess.run(summary_op)
                     summary_writer.add_summary(summary_str,step_vals[0])
-                   # else:
-                    #    break
-                    #time.sleep(FLAGS.test_interval_secs)
+
             except tf.errors.OutOfRangeError:
                 print('Done')
-            #finally:
-            #    coord.request_stop()
 
 if __name__ == '__main__':
     tf.app.run()

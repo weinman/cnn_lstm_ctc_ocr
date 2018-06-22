@@ -51,31 +51,35 @@ def bucketed_input_pipeline(base_dir,file_patterns,
         dataset = dataset.map(_parse_function, 
                               num_parallel_calls=num_threads)
         
-        dataset = dataset.filter(lambda image, 
-                                 width, 
-                                 label, 
-                                 length, 
-                                 text, 
-                                 filename:
-                                 _get_input_filter(width, width_threshhold,
-                                                   length, length_threshhold))
+        # Filter out inappropriately dimension-ed elements
+        dataset = dataset.filter(
+            lambda _, width, _, length, _, _:
+            _get_input_filter(width, width_threshhold,
+                              length, length_threshhold))
 
-        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length
-                                (element_length_func=_element_length_fn,
-                                 bucket_batch_sizes=np.full
-                                 (len(boundaries) + 1, batch_size),
-                                 bucket_boundaries=boundaries))
-        #TODO potentially add a prefetch after batching (of 1)
-        dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(batch_size, 
-                                                                   count=num_epoch))
+        # Bucket according to image width and batch
+        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
+            element_length_func=_element_length_fn,
+            bucket_batch_sizes=np.full(len(boundaries) + 1, batch_size),
+            bucket_boundaries=boundaries))
 
-        dataset = dataset.map(lambda image, 
-                              width, label, 
-                              length, text, 
-                              filename, get_input: 
-                              (image, width, 
-                              tf.cast(tf.deserialize_many_sparse(label, tf.int64), tf.int32),
-                              length, text, filename, get_input))
+        
+
+        # Deserialize sparse tensor
+        dataset = dataset.map(
+            lambda image, width, label, length, text, filename: 
+            (image, 
+             width, 
+             tf.cast(tf.deserialize_many_sparse(label, tf.int64), 
+                     tf.int32),
+             length, 
+             text, 
+             filename),
+            num_parallel_calls=num_threads)
+
+        # Repeat for num_epochs
+        dataset = dataset.apply(
+            tf.contrib.data.shuffle_and_repeat(batch_size, count=num_epoch))
 
     return dataset
 
@@ -94,24 +98,26 @@ def threaded_input_pipeline(base_dir,file_patterns,
     
     with tf.device(batch_device): # Create batch queue
 
-        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length
-                                (element_length_func=_element_length_fn,
-                                 bucket_batch_sizes=np.full
-                                 (len([32, 64, 96, 128, 160, 192, 224, 256]) + 1, batch_size),
-                                 bucket_boundaries=[32, 64, 96, 128, 160, 192, 224, 256]))
-        
+        # Hack -- probably a better way to do this! Just want dynamic padding!
+        # Pad batches to max data size (bucketing it all into the same bucket)
+        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
+                       element_length_func=_element_length_fn,
+                       bucket_batch_sizes=[batch_size, batch_size],
+                       bucket_boundaries=[0]))
 
-        #dataset = dataset.padded_batch(batch_size, )
+        # Deserialize sparse tensors
+        dataset = dataset.map(
+            lambda image, width, label, length, text, filename: 
+            (image, 
+             width, 
+             tf.cast(tf.deserialize_many_sparse(label, tf.int64), 
+                     tf.int32),
+             length, 
+             text, 
+             filename),
+            num_parallel_calls=num_threads)
 
-        dataset = dataset.map(lambda image, 
-                              width, label, 
-                              length, text, 
-                              filename: 
-                              (image, width, 
-                              tf.cast(tf.deserialize_many_sparse(label, tf.int64), tf.int32),
-                              length, text, filename))
-
-    return dataset
+    return dataset.prefetch(1)
 
 def _element_length_fn(image, width, label, length, text, filename):
     return width
@@ -151,6 +157,7 @@ def _get_input_filter(width, width_threshold, length, length_threshold):
 
 def _get_dataset(base_dir, file_patterns=['*.tfrecord']):
     """Get a data queue for a list of record files"""
+    # NOTE/TODO should really use interleave for parallel processing of files
 
     # List of lists ...
     data_files = [tf.gfile.Glob(os.path.join(base_dir,file_pattern))
@@ -168,17 +175,17 @@ def _parse_function(data):
     """Parse the elements of the dataset"""
 
     feature_map = {
-        'image/encoded':  tf.FixedLenFeature( [], dtype=tf.string, 
-                                              default_value='' ),
-        'image/labels':   tf.VarLenFeature( dtype=tf.int64 ), 
-        'image/width':    tf.FixedLenFeature( [1], dtype=tf.int64,
-                                              default_value=1 ),
-        'image/filename': tf.FixedLenFeature([], dtype=tf.string,
-                                             default_value='' ),
-        'text/string':     tf.FixedLenFeature([], dtype=tf.string,
-                                              default_value='' ),
-        'text/length':    tf.FixedLenFeature( [1], dtype=tf.int64,
-                                              default_value=1 )
+        'image/encoded'  :   tf.FixedLenFeature([], dtype=tf.string, 
+                                                default_value='' ),
+        'image/labels'   :   tf.VarLenFeature( dtype=tf.int64 ), 
+        'image/width'    :   tf.FixedLenFeature([1], dtype=tf.int64,
+                                                default_value=1 ),
+        'image/filename' :   tf.FixedLenFeature([], dtype=tf.string,
+                                                default_value='' ),
+        'text/string'    :   tf.FixedLenFeature([], dtype=tf.string,
+                                                default_value='' ),
+        'text/length'    :   tf.FixedLenFeature([1], dtype=tf.int64,
+                                                default_value=1 )
     }
     
     features = tf.parse_single_example(data, feature_map)
