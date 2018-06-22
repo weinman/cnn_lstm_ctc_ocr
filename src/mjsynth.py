@@ -53,9 +53,9 @@ def bucketed_input_pipeline(base_dir,file_patterns,
         
         # Filter out inappropriately dimension-ed elements
         dataset = dataset.filter(
-            lambda _, width, _, length, _, _:
-            _get_input_filter(width, width_threshhold,
-                              length, length_threshhold))
+            lambda image, width, label, length, text, filename:
+            _get_input_filter(width, width_threshold,
+                              length, length_threshold))
 
         # Bucket according to image width and batch
         dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
@@ -64,6 +64,9 @@ def bucketed_input_pipeline(base_dir,file_patterns,
             bucket_boundaries=boundaries))
 
         
+        # Repeat for num_epochs
+        dataset = dataset.apply(
+            tf.contrib.data.shuffle_and_repeat(batch_size, count=num_epoch))
 
         # Deserialize sparse tensor
         dataset = dataset.map(
@@ -77,9 +80,7 @@ def bucketed_input_pipeline(base_dir,file_patterns,
              filename),
             num_parallel_calls=num_threads)
 
-        # Repeat for num_epochs
-        dataset = dataset.apply(
-            tf.contrib.data.shuffle_and_repeat(batch_size, count=num_epoch))
+
 
     return dataset
 

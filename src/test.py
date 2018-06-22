@@ -123,9 +123,10 @@ def _get_init_trained():
     return init_fn
 
 def main(argv=None):
-    input_stream = _get_input_stream()
+    
     with tf.Graph().as_default():
-        image,width,label,length,_ = input_stream.get_next()
+        input_stream = _get_input_stream()
+        image,width,label,length,_, _ = input_stream.get_next()
 
         with tf.device(FLAGS.device):
             features,sequence_length = model.convnet_layers( image, width, mode)

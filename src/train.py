@@ -71,7 +71,7 @@ mode = learn.ModeKeys.TRAIN # 'Configure' training mode for dropout layers
 
 def _get_input_stream():
     """Set up and return image, label, and image width tensors"""
-
+    print("Getting input stream...")
     dataset=mjsynth.bucketed_input_pipeline(
         FLAGS.train_path, 
         str.split(FLAGS.filename_pattern,','),
@@ -170,10 +170,11 @@ def _get_init_pretrained():
 
 
 def main(argv=None):
-    input_stream = _get_input_stream()
+
     with tf.Graph().as_default():
+        input_stream = _get_input_stream()
         global_step = tf.train.get_or_create_global_step()
-        
+
         image, width, label, _, _, _ = input_stream.get_next()
 
         with tf.device(FLAGS.train_device):
