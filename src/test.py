@@ -18,7 +18,7 @@ import os
 import time
 import tensorflow as tf
 from tensorflow.contrib import learn
-
+import cv2
 import mjsynth
 import model
 
@@ -60,11 +60,11 @@ def _get_input():
         num_threads=FLAGS.num_input_threads,
         batch_device=FLAGS.device, 
         preprocess_device=FLAGS.device )
-    
     iterator = dataset.make_one_shot_iterator()
-    image, width, label, length, _, _ = iterator.get_next()
-    
-    return image,width,label,length
+    while True:
+        image, width, label, length, _ = iterator.get_next()
+        yield image, width, label, length
+
 
 def _get_session_config():
     """Setup session config to soften device placement"""
@@ -127,8 +127,9 @@ def _get_init_trained():
 
 def main(argv=None):
 
+    iter = _get_input()
     with tf.Graph().as_default():
-        image,width,label,length = _get_input()
+        image,width,label,length = next(iter)
 
         with tf.device(FLAGS.device):
             features,sequence_length = model.convnet_layers( image, width, mode)
@@ -162,20 +163,13 @@ def main(argv=None):
 
             try:            
                 while True:
-                    restore_model(sess, _get_checkpoint()) # Get latest checkpoint
-                    
-                    #if not coord.should_stop():
+                    restore_model(sess, _get_checkpoint()) 
                     step_vals = sess.run(step_ops)
                     print step_vals
                     summary_str = sess.run(summary_op)
                     summary_writer.add_summary(summary_str,step_vals[0])
-                   # else:
-                    #    break
-                    #time.sleep(FLAGS.test_interval_secs)
             except tf.errors.OutOfRangeError:
                 print('Done')
-            #finally:
-            #    coord.request_stop()
 
 if __name__ == '__main__':
     tf.app.run()

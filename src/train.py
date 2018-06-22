@@ -81,10 +81,11 @@ def _get_input():
         width_threshold=FLAGS.width_threshold,
         length_threshold=FLAGS.length_threshold )
     
-    iterator = make_one_shot_iterator() #TODO CHANGE THIS TO REINITIALIZABLE ITERATOR!!!!!!!!!!!
+    iterator = dataset.make_one_shot_iterator() 
     #tf.summary.image('images',image) # Uncomment to see images in TensorBoard
     while True:
-        yield iterator.get_next(dataset) #image,width,label
+        image, width, label, _, _ = iterator.get_next()
+        yield image, width, label
 
 
 def _get_single_input():
@@ -99,7 +100,7 @@ def _get_single_input():
         num_epochs=1,
         batch_device=FLAGS.input_device, 
         preprocess_device=FLAGS.input_device )
-    return image,width,label,length,text,filename
+    return image,width,label,length,text
 
 
 def _get_training(rnn_logits,label,sequence_length):
@@ -172,12 +173,11 @@ def _get_init_pretrained():
 
 
 def main(argv=None):
-    
+    iter = _get_input()
     with tf.Graph().as_default():
         global_step = tf.train.get_or_create_global_step()
         
-        image, width, label = _get_input()
-
+        image, width, label = next(iter)
         with tf.device(FLAGS.train_device):
             features,sequence_length = model.convnet_layers( image, width, mode)
             logits = model.rnn_layers( features, sequence_length,

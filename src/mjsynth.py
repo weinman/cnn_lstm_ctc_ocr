@@ -46,38 +46,38 @@ def bucketed_input_pipeline(base_dir,file_patterns,
       filename : Source file path
     """
 
-    dataset = _get_dataset(base_dir, file_patterns)
+    dataset = _get_dataset()
 
     with tf.device(input_device): # Create bucketing batcher
 
-        dataset = dataset.map(_parse_function, 
+        dataset = dataset.map(_preprocess_dataset, 
                               num_parallel_calls=num_threads)
         
+        # Remove input that doesn't fit necessary specifications
         dataset = dataset.filter(lambda image, 
                                  width, 
                                  label, 
                                  length, 
-                                 text, 
-                                 filename:
-                                 _get_input_filter(width, width_threshhold,
-                                                   length, length_threshhold))
+                                 text: 
+                                 _get_input_filter(width, width_threshold,
+                                                   length, length_threshold))
 
         dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length
                                 (element_length_func=_element_length_fn,
                                  bucket_batch_sizes=np.full
                                  (len(boundaries) + 1, batch_size),
                                  bucket_boundaries=boundaries))
+
         #TODO potentially add a prefetch after batching (of 1)
         dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(batch_size, 
                                                                    count=num_epoch))
 
         dataset = dataset.map(lambda image, 
-                              width, label, 
-                              length, text, 
-                              filename, get_input: 
+                              width, label,
+                              length, text:
                               (image, width, 
-                              tf.cast(tf.deserialize_many_sparse(label, tf.int64), tf.int32),
-                              length, text, filename, get_input))
+                               tf.contrib.layers.dense_to_sparse(label,0),
+                               length, text))
 
     return dataset
 
@@ -87,11 +87,10 @@ def threaded_input_pipeline(base_dir,file_patterns,
                             batch_device=None,
                             preprocess_device=None):
 
-    dataset = _get_dataset(base_dir, file_patterns)
+    dataset = _get_dataset()
 
     with tf.device(preprocess_device):
-            
-        dataset = dataset.map(_parse_function,
+        dataset = dataset.map(_preprocess_dataset,
                               num_parallel_calls=num_threads)
     
     with tf.device(batch_device): # Create batch
@@ -100,20 +99,19 @@ def threaded_input_pipeline(base_dir,file_patterns,
         # Pad batches to max data size (bucketing it all into the same bucket)
         dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length
                                 (element_length_func=_element_length_fn,
-                                 bucket_batch_sizes=[batch_size],
-                                 bucket_boundaries=[]))
+                                 bucket_batch_sizes=[batch_size, batch_size],
+                                 bucket_boundaries=[0]))
 
         dataset = dataset.map(lambda image, 
                               width, label, 
-                              length, text, 
-                              filename: 
+                              length, text: 
                               (image, width, 
-                              tf.cast(tf.deserialize_many_sparse(label, tf.int64), tf.int32),
-                              length, text, filename))
+                              tf.contrib.layers.dense_to_sparse(label,0),
+                              length, text))
 
     return dataset
 
-def _element_length_fn(image, width, label, length, text, filename):
+def _element_length_fn(image, width, label, length, text):
     return width
 
 def dataset_element_length_fn(_, image):
@@ -154,12 +152,13 @@ def _get_input_filter(width, width_threshold, length, length_threshold):
 
 def _get_dataset():
     """Get a dataset from generator"""
-    return tf.data.Dataset.from_generator(data_generator, 
-                                          (tf.string, tf.int32),
-                                          (tf.TensorShape([]), 
-                                           (tf.TensorShape((32, None, 3)))))
-    return dataset
+    return tf.data.Dataset.from_generator(_generator_wrapper, 
+            (tf.string, tf.int32, tf.int32),
+            (tf.TensorShape([]), 
+            (tf.TensorShape((32, None, 3))),
+            (tf.TensorShape([None]))))
 
+# Note: Currently not in use: probably more optimal than current implmntation
 def _text_to_labels(text):
     """Convert given text (tf.string) into a list of tf.int32's"""
     labels = tf.data.Dataset.from_tensor_slices(tf.string_split([text],""))
@@ -173,7 +172,7 @@ def _text_to_labels(text):
     
     return labels
 
-def _preprocess_dataset(caption, image):
+def _preprocess_dataset(caption, image, labels):
     """Get everything how it should be"""
 
     #NOTE: final image should be pre-grayed by opencv *before* generation
@@ -181,21 +180,20 @@ def _preprocess_dataset(caption, image):
     image = _preprocess_image(image)
 
     width = tf.size(image[1]) 
-    labels = _text_to_labels(caption)  
+    # labels = _text_to_labels(caption) Not necessary with precomputed labels
     length = tf.size(labels)
     text = caption
-    return image, width, label, length, text
+    return image, width, labels, length, text
                 
-
-def _parse_function(dataset, num_threads):
-    """Parse the elements of the dataset"""
+"""
+def _parse_function(caption, image, labels):
+    Parse the elements of the dataset
     
     # Format elements appropriately
-    dataset = dataset.map(_preprocess_dataset, num_parallel_calls=num_threads)
+    dataset = .map(_preprocess_dataset, num_parallel_calls=num_threads)
 
     return dataset
-
-
+"""
 
 def _char_to_int(character):
     """Convert given character (really tf.string of length 1) to its integer representation from out_charset"""
@@ -204,11 +202,18 @@ def _char_to_int(character):
     return out_charset.index(character)
 
 def _generator_wrapper():
-    caption, image = data_generator()
+    """Compute the labels in python before everything becomes tensors
+       Note: very! SUBOPTIMAL-- Really should not be doing this in python
+       if we don't have to!!!"""
+    gen = data_generator()
+    while True:
+        data = next(gen)
+        caption = data[0]
+        image = data[1]
 
-    # Transform string text to sequence of indices using charset
-    labels = [out_charset.index(c) for c in list(caption)
-    yield caption, image, labels
+        # Transform string text to sequence of indices using charset
+        labels = [out_charset.index(c) for c in list(caption)]
+        yield caption, image, labels
 
 def _preprocess_image(image):
     # Rescale from uint8([0,255]) to float([-0.5,0.5])
