@@ -4,7 +4,7 @@ import cv2
 import sys
 import numpy as np
 import __future__
-from sample_word_list import get_words
+from words import get_words
 # Global Variable definition
 
 #words=['PM','Charlie','Jerod','Anya','Titus']
