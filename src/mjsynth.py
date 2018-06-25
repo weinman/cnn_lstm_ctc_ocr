@@ -36,20 +36,26 @@ def bucketed_input_pipeline(base_dir,file_patterns,
                             num_epoch=None):
     """Get input tensors bucketed by image width
     Returns:
-      image : float32 image tensor [batch_size 32 ? 1] padded to batch max width
-      width : int32 image widths (for calculating post-CNN sequence length)
-      label : Sparse tensor with label sequences for the batch
-      length : Length of label sequence (text length)
-      text  :  Human readable string for the image
-      filename : Source file path
+      dataset : Dataset with elements structured as follows:
+                [image, width, label, length, text, filename]
     """
-
-    dataset = _get_dataset(base_dir, file_patterns)
-
+    
+    # Get filenames into a dataset format
+    filenames = tf.data.Dataset.from_tensor_slices(
+        _get_filenames(base_dir, file_patterns))
+    
     with tf.device(input_device): # Create bucketing batcher
-
-        dataset = dataset.map(_parse_function, 
-                              num_parallel_calls=num_threads)
+        
+        # https://www.tensorflow.org/performance/datasets_performance
+        dataset = filenames.apply(
+            tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
+                                                cycle_length=4, 
+                                                block_length=8, 
+                                                sloppy=True))
+        
+        # Preprocess
+        dataset = dataset.map(_parse_function, num_parallel_calls=num_threads)
+        
         
         # Filter out inappropriately dimension-ed elements
         dataset = dataset.filter(
@@ -63,7 +69,6 @@ def bucketed_input_pipeline(base_dir,file_patterns,
             bucket_batch_sizes=np.full(len(boundaries) + 1, batch_size),
             bucket_boundaries=boundaries))
 
-        
         # Repeat for num_epochs
         dataset = dataset.apply(
             tf.contrib.data.shuffle_and_repeat(batch_size, count=num_epoch))
@@ -80,9 +85,7 @@ def bucketed_input_pipeline(base_dir,file_patterns,
              filename),
             num_parallel_calls=num_threads)
 
-
-
-    return dataset
+    return dataset.prefetch(1)
 
 def threaded_input_pipeline(base_dir,file_patterns,
                             num_threads=4,
@@ -90,12 +93,20 @@ def threaded_input_pipeline(base_dir,file_patterns,
                             batch_device=None,
                             preprocess_device=None):
 
-    dataset = _get_dataset(base_dir, file_patterns)
+    # Get filenames into a dataset format
+    filenames = tf.data.Dataset.from_tensor_slices(
+        _get_filenames(base_dir, file_patterns))
 
     with tf.device(preprocess_device):
-            
-        dataset = dataset.map(_parse_function,
-                              num_parallel_calls=num_threads)
+        # https://www.tensorflow.org/performance/datasets_performance
+        dataset = filenames.apply(
+            tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
+                                                cycle_length=4, 
+                                                block_length=8, 
+                                                sloppy=True))
+        
+        # Preprocess
+        dataset = dataset.map(_parse_function, num_parallel_calls=num_threads)
     
     with tf.device(batch_device): # Create batch queue
 
@@ -117,10 +128,14 @@ def threaded_input_pipeline(base_dir,file_patterns,
              text, 
              filename),
             num_parallel_calls=num_threads)
+        
+        # Repeat for num_epochs
+        dataset = dataset.apply(
+            tf.contrib.data.shuffle_and_repeat(batch_size, count=num_epoch))
 
     return dataset.prefetch(1)
-
-def _element_length_fn(image, width, label, length, text, filename):
+        
+        def _element_length_fn(image, width, label, length, text, filename):
     return width
 
 def _get_input_filter(width, width_threshold, length, length_threshold):
@@ -156,20 +171,16 @@ def _get_input_filter(width, width_threshold, length, length_threshold):
 
     return keep_input
 
-def _get_dataset(base_dir, file_patterns=['*.tfrecord']):
-    """Get a data queue for a list of record files"""
-    # NOTE/TODO should really use interleave for parallel processing of files
-
+def _get_filenames(base_dir, file_patterns=['*.tfrecord']):
+    """Get a list of record files"""
+    
     # List of lists ...
     data_files = [tf.gfile.Glob(os.path.join(base_dir,file_pattern))
                   for file_pattern in file_patterns]
     # flatten
     data_files = [data_file for sublist in data_files for data_file in sublist]
 
-    # feed filenames for processing
-    dataset = tf.data.TFRecordDataset(data_files)
-
-    return dataset
+    return data_files
 
 # https://www.tensorflow.org/programmers_guide/datasets#consuming_tfrecord_data
 def _parse_function(data):
