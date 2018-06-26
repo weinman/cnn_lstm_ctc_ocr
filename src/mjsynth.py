@@ -88,13 +88,8 @@ def bucketed_input_pipeline(base_dir,file_patterns,
              text, 
              filename),
             num_parallel_calls=num_threads)
-
-
-        itera = dataset.make_one_shot_iterator()
-        image, width, label, _, _, _ = itera.get_next()
-        features = {"image": image, "width": width}
         
-    return features, label
+    return dataset
 
 def threaded_input_pipeline(base_dir,file_patterns,
                             num_threads=4,
