@@ -45,41 +45,56 @@ def bucketed_input_pipeline(base_dir,file_patterns,
       text  :  Human readable string for the image
       filename : Source file path
     """
-
-    dataset = _get_dataset()
-
+    # Get filenames into a dataset format
+    filenames = tf.data.Dataset.from_tensor_slices(
+        _get_filenames(base_dir, file_patterns))
+    
     with tf.device(input_device): # Create bucketing batcher
-
-        dataset = dataset.map(_preprocess_dataset, 
-                              num_parallel_calls=num_threads)
         
-        # Remove input that doesn't fit necessary specifications
-        dataset = dataset.filter(lambda image, 
-                                 width, 
-                                 label, 
-                                 length, 
-                                 text: 
-                                 _get_input_filter(width, width_threshold,
-                                                   length, length_threshold))
+        # https://www.tensorflow.org/performance/datasets_performance
+        dataset = filenames.apply(
+            tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
+                                                cycle_length=num_threads,  
+                                                sloppy=True))
+        
+        # Preprocess
+        dataset = dataset.map(_parse_function, num_parallel_calls=num_threads)
+        
+        # Filter out inappropriately dimension-ed elements
+        if(width_threshold != None or length_threshold != None):
+            dataset = dataset.filter(
+                lambda image, width, label, length, text, filename:
+                _get_input_filter(width, width_threshold,
+                                  length, length_threshold))
 
-        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length
-                                (element_length_func=_element_length_fn,
-                                 bucket_batch_sizes=np.full
-                                 (len(boundaries) + 1, batch_size),
-                                 bucket_boundaries=boundaries))
 
-        #TODO potentially add a prefetch after batching (of 1)
-        dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(batch_size, 
-                                                                   count=num_epoch))
+        # Bucket according to image width and batch
+        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
+            element_length_func=_element_length_fn,
+            bucket_batch_sizes=np.full(len(boundaries) + 1, batch_size),
+            bucket_boundaries=boundaries))
 
-        dataset = dataset.map(lambda image, 
-                              width, label,
-                              length, text:
-                              (image, width, 
-                               tf.contrib.layers.dense_to_sparse(label,0),
-                               length, text))
+        # Repeat for num_epochs
+        dataset = dataset.repeat(num_epoch)
 
-    return dataset
+        # Deserialize sparse tensor
+        dataset = dataset.map(
+            lambda image, width, label, length, text, filename: 
+            (image, 
+             width, 
+             tf.cast(tf.deserialize_many_sparse(label, tf.int64), 
+                     tf.int32),
+             length, 
+             text, 
+             filename),
+            num_parallel_calls=num_threads)
+
+
+        itera = dataset.make_one_shot_iterator()
+        image, width, label, _, _, _ = itera.get_next()
+        features = {"image": image, "width": width}
+        
+    return features, label
 
 def threaded_input_pipeline(base_dir,file_patterns,
                             num_threads=4,
@@ -111,7 +126,7 @@ def threaded_input_pipeline(base_dir,file_patterns,
 
     return dataset
 
-def _element_length_fn(image, width, label, length, text):
+def _element_length_fn(image, width, label, length, text, filename):
     return width
 
 def dataset_element_length_fn(_, image):
@@ -150,13 +165,17 @@ def _get_input_filter(width, width_threshold, length, length_threshold):
 
     return keep_input
 
-def _get_dataset():
-    """Get a dataset from generator"""
-    return tf.data.Dataset.from_generator(_generator_wrapper, 
-            (tf.string, tf.int32, tf.int32),
-            (tf.TensorShape([]), 
-            (tf.TensorShape((32, None, 3))),
-            (tf.TensorShape([None]))))
+def _get_filenames(base_dir, file_patterns=['*.tfrecord']):
+    """Get a list of record files"""
+    
+    # List of lists ...
+    data_files = [tf.gfile.Glob(os.path.join(base_dir,file_pattern))
+                  for file_pattern in file_patterns]
+    # flatten
+    data_files = [data_file for sublist in data_files for data_file in sublist]
+
+    return data_files
+
 
 # Note: Currently not in use: probably more optimal than current implmntation
 def _text_to_labels(text):
@@ -214,6 +233,38 @@ def _generator_wrapper():
         # Transform string text to sequence of indices using charset
         labels = [out_charset.index(c) for c in list(caption)]
         yield caption, image, labels
+
+def _parse_function(data):
+    """Parse the elements of the dataset"""
+
+    feature_map = {
+        'image/encoded'  :   tf.FixedLenFeature([], dtype=tf.string, 
+                                                default_value='' ),
+        'image/labels'   :   tf.VarLenFeature( dtype=tf.int64 ), 
+        'image/width'    :   tf.FixedLenFeature([1], dtype=tf.int64,
+                                                default_value=1 ),
+        'image/filename' :   tf.FixedLenFeature([], dtype=tf.string,
+                                                default_value='' ),
+        'text/string'    :   tf.FixedLenFeature([], dtype=tf.string,
+                                                default_value='' ),
+        'text/length'    :   tf.FixedLenFeature([1], dtype=tf.int64,
+                                                default_value=1 )
+    }
+    
+    features = tf.parse_single_example(data, feature_map)
+    
+    # Initialize fields according to feature map
+    image = tf.image.decode_jpeg( features['image/encoded'], channels=1 ) #gray
+    width = tf.cast( features['image/width'], tf.int32) # for ctc_loss
+    label = tf.serialize_sparse( features['image/labels'] ) # for batching
+    length = features['text/length']
+    text = features['text/string']
+    filename = features['image/filename']
+
+    # Prepare image
+    image = _preprocess_image(image)
+
+    return image,width,label,length,text,filename
 
 def _preprocess_image(image):
     # Rescale from uint8([0,255]) to float([-0.5,0.5])

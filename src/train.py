@@ -19,6 +19,7 @@ import tensorflow as tf
 from tensorflow.contrib import learn
 
 import dynmj
+import mjsynth
 import model
 
 FLAGS = tf.app.flags.FLAGS
@@ -69,6 +70,7 @@ tf.logging.set_verbosity(tf.logging.INFO)
 optimizer='Adam'
 mode = learn.ModeKeys.TRAIN # 'Configure' training mode for dropout layers
 
+
 def _get_input_stream():
     """Set up and return image, label, and image width tensors"""
 
@@ -101,11 +103,10 @@ def _get_training(rnn_logits,label,sequence_length):
 
         if FLAGS.tune_scope:
             scope=FLAGS.tune_scope
-        else:
-            scope="convnet|rnn"
+        else:            scope="convnet|rnn"
 
         rnn_vars = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES,
-                                       scope=scope)
+                                       scope=scope)        
 
         loss = model.ctc_loss_layer(rnn_logits,label,sequence_length) 
 
@@ -133,9 +134,12 @@ def _get_training(rnn_logits,label,sequence_length):
                 optimizer=optimizer,
                 variables=rnn_vars)
 
+            print("__________________________________________")
+            print(train_op)
+
             tf.summary.scalar( 'learning_rate', learning_rate )
 
-    return train_op
+    return train_op, loss
 
 
 def _get_session_config():
@@ -163,60 +167,96 @@ def _get_init_pretrained():
 
     return init_fn
 
+def _get_input_tuple(image, width, label):
+    """Return input tuple"""
 
-def main(argv=None):
+    features = {"image": image, "width": width}
     
-    
+    return features, label
+
+def model_fn(features, labels, mode):
+    """Model function for the estimator object"""
+
+    with tf.device(FLAGS.train_device):
+
+        image = features['image']
+        width = features['width']
+
+        conv_features, sequence_length = model.convnet_layers( image, width, mode)        
+        logits = model.rnn_layers( conv_features, sequence_length,
+                                       mjsynth.num_classes() )
+        train_op, loss = _get_training(logits,labels,sequence_length)
+        
+
+    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
+
+def main(argv=None):  
     
     with tf.Graph().as_default():
-        global_step = tf.train.get_or_create_global_step()
 
-        input_stream = _get_input_stream()
-        
-        # Grab the next batch of data from input_stream 
-        image, width, label, _, _ = input_stream.get_next()
-
-        with tf.device(FLAGS.train_device):
-            features,sequence_length = model.convnet_layers( image, width, mode)
-            logits = model.rnn_layers( features, sequence_length,
-                                       dynmj.num_classes() )
-            train_op = _get_training(logits,label,sequence_length)
-
-        session_config = _get_session_config()
-
-        summary_op = tf.summary.merge_all()
-        init_op = tf.group( tf.global_variables_initializer(),
-                            tf.local_variables_initializer())
-
-        init_scaffold = tf.train.Scaffold(
-            init_op=init_op,
-            init_fn=_get_init_pretrained()
-        )
-
-        summary_hook = tf.train.SummarySaverHook(
-            output_dir=FLAGS.output,
-            save_secs=30,
-            summary_op=summary_op
-        )
-        
         saver_hook = tf.train.CheckpointSaverHook(
             checkpoint_dir=FLAGS.output,
-            save_secs=150
-        )
+            save_secs=150)
 
-        monitor = tf.train.MonitoredTrainingSession(
-            checkpoint_dir=FLAGS.output, # Necessary to restore
-            hooks=[summary_hook,saver_hook],
-            config=session_config,
-            scaffold=init_scaffold       # Scaffold initializes session
-        )
-        
-        with monitor as sess:
-            step = sess.run(global_step)
-            while step < FLAGS.max_num_steps:
-                if monitor.should_stop():
-                    break
-                [step_loss,step]=sess.run([train_op, global_step])
+        hooks = [saver_hook]
+
+        # Initialize the classifier
+        classifier = tf.estimator.Estimator(model_fn=model_fn, 
+                                            model_dir=FLAGS.output)
+
+        # Train the model
+        classifier.train(input_fn=lambda: mjsynth.bucketed_input_pipeline(
+            FLAGS.train_path, 
+            str.split(FLAGS.filename_pattern,','),
+            batch_size=FLAGS.batch_size,
+            num_threads=FLAGS.num_input_threads,
+            input_device=FLAGS.input_device,
+            width_threshold=FLAGS.width_threshold,
+            length_threshold=FLAGS.length_threshold ),
+                         hooks=hooks)
+
+
+    """with tf.device(FLAGS.train_device):
+        features,sequence_length = model.convnet_layers( image, width, mode)
+        logits = model.rnn_layers( features, sequence_length,
+                                   dynmj.num_classes() )
+        train_op = _get_training(logits,label,sequence_length)
+
+    session_config = _get_session_config()
+
+    summary_op = tf.summary.merge_all()
+    init_op = tf.group( tf.global_variables_initializer(),
+                        tf.local_variables_initializer())
+
+    init_scaffold = tf.train.Scaffold(
+        init_op=init_op,
+        init_fn=_get_init_pretrained()
+    )
+
+    summary_hook = tf.train.SummarySaverHook(
+        output_dir=FLAGS.output,
+        save_secs=30,
+        summary_op=summary_op
+    )
+
+    saver_hook = tf.train.CheckpointSaverHook(
+        checkpoint_dir=FLAGS.output,
+        save_secs=150
+    )
+
+    monitor = tf.train.MonitoredTrainingSession(
+        checkpoint_dir=FLAGS.output, # Necessary to restore
+        hooks=[summary_hook,saver_hook],
+        config=session_config,
+        scaffold=init_scaffold       # Scaffold initializes session
+    )
+
+    with monitor as sess:
+        step = sess.run(global_step)
+        while step < FLAGS.max_num_steps:
+            if monitor.should_stop():
+                break
+            [step_loss,step]=sess.run([train_op, global_step])"""
 
 if __name__ == '__main__':
     tf.app.run()
