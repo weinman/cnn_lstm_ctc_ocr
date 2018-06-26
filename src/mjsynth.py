@@ -22,6 +22,7 @@ import numpy as np
 # If any example contains a character not found here, an error will result
 # from the calls to .index in the decoder below
 out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+FLAGS = tf.app.flags.FLAGS
 
 def num_classes():
     return len(out_charset)
@@ -43,14 +44,19 @@ def bucketed_input_pipeline(base_dir,file_patterns,
     # Get filenames into a dataset format
     filenames = tf.data.Dataset.from_tensor_slices(
         _get_filenames(base_dir, file_patterns))
-    
+
+    # TODO: Think about sharding if we're going to have multiple processors?    
     with tf.device(input_device): # Create bucketing batcher
         
         # https://www.tensorflow.org/performance/datasets_performance
-        dataset = filenames.apply(
-            tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
-                                                cycle_length=num_threads,  
-                                                sloppy=True))
+        dataset = filenames.apply(tf.contrib.data \
+            .parallel_interleave(lambda filenames:
+                                 (tf.data.TFRecordDataset(
+                                     filenames, 
+                                     buffer_size=batch_size, 
+                                     num_parallel_reads=num_threads)),
+                                 cycle_length=num_threads,  
+                                 sloppy=True))
         
         # Preprocess
         dataset = dataset.map(_parse_function, num_parallel_calls=num_threads)
@@ -203,7 +209,7 @@ def _parse_function(data):
     
     # Initialize fields according to feature map
     image = tf.image.decode_jpeg( features['image/encoded'], channels=1 ) #gray
-    width = tf.cast( features['image/width'], tf.int32) # for ctc_loss
+    width = tf.cast( features['image/width'], tf.int32 ) # for ctc_loss
     label = tf.serialize_sparse( features['image/labels'] ) # for batching
     length = features['text/length']
     text = features['text/string']
