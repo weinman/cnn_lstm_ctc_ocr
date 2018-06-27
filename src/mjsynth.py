@@ -41,6 +41,9 @@ def bucketed_input_pipeline(base_dir,file_patterns,
                 [image, width, label, length, text, filename]
     """
     
+    # Buffer size for TFRecord readers
+    capacity = num_threads*batch_size*2
+
     # Get filenames into a dataset format
     filenames = tf.data.Dataset.from_tensor_slices(
         _get_filenames(base_dir, file_patterns))
@@ -53,7 +56,7 @@ def bucketed_input_pipeline(base_dir,file_patterns,
             .parallel_interleave(lambda filenames:
                                  (tf.data.TFRecordDataset(
                                      filenames, 
-                                     buffer_size=batch_size, 
+                                     buffer_size=capacity, 
                                      num_parallel_reads=num_threads)),
                                  cycle_length=num_threads,  
                                  sloppy=True))
