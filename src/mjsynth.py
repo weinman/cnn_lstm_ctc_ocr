@@ -22,7 +22,6 @@ import numpy as np
 # If any example contains a character not found here, an error will result
 # from the calls to .index in the decoder below
 out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-FLAGS = tf.app.flags.FLAGS
 
 def num_classes():
     return len(out_charset)
@@ -51,15 +50,10 @@ def bucketed_input_pipeline(base_dir,file_patterns,
     # TODO: Think about sharding if we're going to have multiple processors?    
     with tf.device(input_device): # Create bucketing batcher
         
-        # https://www.tensorflow.org/performance/datasets_performance
-        dataset = filenames.apply(tf.contrib.data \
-            .parallel_interleave(lambda filenames:
-                                 (tf.data.TFRecordDataset(
-                                     filenames, 
-                                     buffer_size=capacity, 
-                                     num_parallel_reads=num_threads)),
-                                 cycle_length=num_threads,  
-                                 sloppy=True))
+        dataset = filenames.apply(
+            tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
+                                                cycle_length=num_threads,  
+                                                sloppy=True))
         
         # Preprocess
         dataset = dataset.map(_parse_function, num_parallel_calls=num_threads)
@@ -93,7 +87,7 @@ def bucketed_input_pipeline(base_dir,file_patterns,
              filename),
             num_parallel_calls=num_threads)
 
-    return dataset.prefetch(1)
+    return dataset.prefetch(2*num_threads) # prefetch 2*num_threads*batch_size
 
 def threaded_input_pipeline(base_dir,file_patterns,
                             num_threads=4,
@@ -140,7 +134,7 @@ def threaded_input_pipeline(base_dir,file_patterns,
         # Repeat for num_epochs
         dataset = dataset.repeat(num_epochs)
 
-    return dataset.prefetch(1)
+    return dataset.prefetch(2*num_threads)
         
                                 
 def _element_length_fn(image, width, label, length, text, filename):
