@@ -19,8 +19,10 @@ import time
 import tensorflow as tf
 from tensorflow.contrib import learn
 import cv2
-import dynmj
+#import dynmj
+import mjsynth
 import model
+
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -35,7 +37,7 @@ tf.app.flags.DEFINE_integer('test_interval_secs', 60,
                              'Time between test runs')
 
 tf.app.flags.DEFINE_string('device','/gpu:0',
-                           """Device for graph placement""")
+                          """Device for graph placement""")
 
 tf.app.flags.DEFINE_string('test_path','../data/',
                            """Base directory for test/validation data""")
@@ -47,19 +49,26 @@ tf.app.flags.DEFINE_integer('num_input_threads',4,
 tf.logging.set_verbosity(tf.logging.WARN)
 
 # Non-configurable parameters
-mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
+#mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
 
 def _get_input_stream():
     """Set up and return image, label, width and text tensors"""
 
-    dataset=dynmj.threaded_input_pipeline(
+    dataset=mjsynth.threaded_input_pipeline(
+        FLAGS.test_path, 
+        str.split(FLAGS.filename_pattern,','),
         batch_size=FLAGS.batch_size,
         num_threads=FLAGS.num_input_threads,
-        batch_device=FLAGS.device, 
+        batch_device=FLAGS.device,
         preprocess_device=FLAGS.device)
 
-    return dataset.make_one_shot_iterator()
+    iterator = dataset.make_one_shot_iterator() 
+    
+    image, width, label, length, _, _ = iterator.get_next()
 
+    # The input for the model function 
+    features = {"image": image, "width": width, "length": length, "label": label}
+    return features, label
 
 def _get_session_config():
     """Setup session config to soften device placement"""
@@ -120,10 +129,47 @@ def _get_init_trained():
     init_fn = lambda sess,ckpt_path: saver_reader.restore(sess, ckpt_path)
     return init_fn
 
-def main(argv=None):
+def model_fn (features, labels, mode):
+    """Model function for the estimator object"""
     
+    with tf.device(FLAGS.device):
 
-    with tf.Graph().as_default():
+        image = features['image']
+        width = features['width']
+        length = features['length']
+        label = features['label']
+
+        features,sequence_length = model.convnet_layers( image, width, mode)
+        logits = model.rnn_layers(features, sequence_length,
+                                       mjsynth.num_classes())
+        loss,label_error,sequence_error = _get_testing(
+                logits,sequence_length,label,length)
+
+        global_step = tf.train.get_or_create_global_step()
+        step_ops = [loss, label_error, sequence_error]
+
+        logging_hook = tf.train.LoggingTensorHook({"global_step": global_step, 
+                                                   "loss" : loss, 
+                                                   "label_error" : label_error,
+                                                   "sequence_error" : sequence_error}, 
+                                                  every_n_iter=100)
+    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, predictions=tf.nn.softmax(logits), 
+                                      train_op=None, prediction_hooks=[logging_hook])
+    
+def main(argv=None):
+
+    # Initialize the classifier
+    classifier = tf.estimator.Estimator(model_fn=model_fn, 
+                                        model_dir=FLAGS.model,
+                                        config=tf.estimator.RunConfig(
+                                            session_config=
+                                            _get_session_config()))
+
+    predictions = list(classifier.predict(input_fn=lambda: _get_input_stream()))
+    print('Predictions: {}' .format(str(predictions)))
+   
+
+    """with tf.Graph().as_default():
         input_stream = _get_input_stream()
 
         # Get the next batch
@@ -163,7 +209,7 @@ def main(argv=None):
                     summary_str = sess.run(summary_op)
                     summary_writer.add_summary(summary_str,step_vals[0])
             except tf.errors.OutOfRangeError:
-                print('Done')
+                print('Done')"""
 
 if __name__ == '__main__':
     tf.app.run()

@@ -17,7 +17,7 @@
 import os
 import tensorflow as tf
 import numpy as np
-from map_generator import data_generator
+#from map_generator import data_generator
 
 # The list (well, string) of valid output characters
 # If any example contains a character not found here, an error will result
@@ -97,11 +97,22 @@ def threaded_input_pipeline(base_dir,file_patterns,
                             batch_device=None,
                             preprocess_device=None):
 
-    dataset = _get_dataset()
+    # Get filenames into a dataset format
+    #filenames = tf.data.Dataset.from_tensor_slices(
+    #    _get_filenames(base_dir, file_patterns))
+
+    dataset = tf.data.TFRecordDataset(_get_filenames(base_dir, file_patterns))
 
     with tf.device(preprocess_device):
-        dataset = dataset.map(_preprocess_dataset,
+
+        # https://www.tensorflow.org/performance/datasets_performance
+        #dataset = filenames.apply(
+        #    tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
+        #                                        cycle_length=num_threads,  
+        #                                        sloppy=True))
+        dataset = dataset.map(_parse_function,
                               num_parallel_calls=num_threads)
+
     
     with tf.device(batch_device): # Create batch
 
@@ -114,10 +125,14 @@ def threaded_input_pipeline(base_dir,file_patterns,
 
         dataset = dataset.map(lambda image, 
                               width, label, 
-                              length, text: 
+                              length, text, filename: 
                               (image, width, 
-                              tf.contrib.layers.dense_to_sparse(label,0),
-                              length, text))
+                               tf.cast(tf.deserialize_many_sparse(label, tf.int64), 
+                                       tf.int32),
+                               length, text, filename))
+        num_epochs = None
+        # Repeat for num_epochs
+        dataset = dataset.repeat(num_epochs)
 
     return dataset
 
