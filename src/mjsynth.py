@@ -98,18 +98,17 @@ def threaded_input_pipeline(base_dir,file_patterns,
                             preprocess_device=None):
 
     # Get filenames into a dataset format
-    #filenames = tf.data.Dataset.from_tensor_slices(
-    #    _get_filenames(base_dir, file_patterns))
+    filenames = tf.data.Dataset.from_tensor_slices(
+        _get_filenames(base_dir, file_patterns))
 
-    dataset = tf.data.TFRecordDataset(_get_filenames(base_dir, file_patterns))
 
     with tf.device(preprocess_device):
 
         # https://www.tensorflow.org/performance/datasets_performance
-        #dataset = filenames.apply(
-        #    tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
-        #                                        cycle_length=num_threads,  
-        #                                        sloppy=True))
+        dataset = filenames.apply(
+            tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
+                                                cycle_length=num_threads,  
+                                                sloppy=True))
         dataset = dataset.map(_parse_function,
                               num_parallel_calls=num_threads)
 
@@ -120,7 +119,7 @@ def threaded_input_pipeline(base_dir,file_patterns,
         # Pad batches to max data size (bucketing it all into the same bucket)
         dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length
                                 (element_length_func=_element_length_fn,
-                                 bucket_batch_sizes=[batch_size, batch_size],
+                                 bucket_batch_sizes=[0, 10],
                                  bucket_boundaries=[0]))
 
         dataset = dataset.map(lambda image, 
@@ -130,9 +129,9 @@ def threaded_input_pipeline(base_dir,file_patterns,
                                tf.cast(tf.deserialize_many_sparse(label, tf.int64), 
                                        tf.int32),
                                length, text, filename))
-        num_epochs = None
+
         # Repeat for num_epochs
-        dataset = dataset.repeat(num_epochs)
+        #dataset = dataset.repeat(num_epochs)
 
     return dataset
 

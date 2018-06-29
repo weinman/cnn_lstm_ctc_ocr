@@ -13,7 +13,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import os
 import time
 import tensorflow as tf
@@ -22,7 +21,7 @@ import cv2
 #import dynmj
 import mjsynth
 import model
-
+import numpy as np
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -47,6 +46,7 @@ tf.app.flags.DEFINE_integer('num_input_threads',4,
                           """Number of readers for input data""")
 
 tf.logging.set_verbosity(tf.logging.WARN)
+
 
 # Non-configurable parameters
 #mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
@@ -106,7 +106,7 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
         tf.summary.scalar( 'loss', loss )
         tf.summary.scalar( 'label_error', label_error )
         tf.summary.scalar( 'sequence_error', sequence_error )
-
+        print(loss)
     return loss, label_error, sequence_error
 
 def _get_checkpoint():
@@ -142,74 +142,37 @@ def model_fn (features, labels, mode):
         features,sequence_length = model.convnet_layers( image, width, mode)
         logits = model.rnn_layers(features, sequence_length,
                                        mjsynth.num_classes())
+
         loss,label_error,sequence_error = _get_testing(
                 logits,sequence_length,label,length)
 
-        global_step = tf.train.get_or_create_global_step()
-        step_ops = [loss, label_error, sequence_error]
+        global_step = tf.convert_to_tensor(tf.train.get_or_create_global_step())
+        global_step = tf.cast(global_step, tf.float32)
+        sequence_error = tf.cast(sequence_error, tf.float32)
 
-        logging_hook = tf.train.LoggingTensorHook({"global_step": global_step, 
-                                                   "loss" : loss, 
-                                                   "label_error" : label_error,
-                                                   "sequence_error" : sequence_error}, 
-                                                  every_n_iter=100)
-    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, predictions=tf.nn.softmax(logits), 
-                                      train_op=None, prediction_hooks=[logging_hook])
+        #Get the correct format to pass tp estimator spec
+        result = tf.convert_to_tensor([(tf.stack([global_step,
+                                                  loss, 
+                                                  label_error, 
+                                                  sequence_error], axis=0))])
+
+    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, 
+                                      predictions=result, 
+                                      train_op=None)
     
 def main(argv=None):
+
+    custom_config = tf.estimator.RunConfig(session_config=_get_session_config())
+    
+   
 
     # Initialize the classifier
     classifier = tf.estimator.Estimator(model_fn=model_fn, 
                                         model_dir=FLAGS.model,
-                                        config=tf.estimator.RunConfig(
-                                            session_config=
-                                            _get_session_config()))
+                                        config=custom_config)
 
-    predictions = list(classifier.predict(input_fn=lambda: _get_input_stream()))
-    print('Predictions: {}' .format(str(predictions)))
-   
-
-    """with tf.Graph().as_default():
-        input_stream = _get_input_stream()
-
-        # Get the next batch
-        image,width,label,length, _ = input_stream.get_next()
-
-        with tf.device(FLAGS.device):
-            features,sequence_length = model.convnet_layers( image, width, mode)
-            logits = model.rnn_layers( features, sequence_length,
-                                       dynmj.num_classes() )
-            loss,label_error,sequence_error = _get_testing(
-                logits,sequence_length,label,length)
-
-        global_step = tf.train.get_or_create_global_step()
-
-        session_config = _get_session_config()
-        restore_model = _get_init_trained()
-
-        summary_op = tf.summary.merge_all()
-        init_op = tf.group( tf.global_variables_initializer(),
-                            tf.local_variables_initializer()) 
-
-        summary_writer = tf.summary.FileWriter( os.path.join(FLAGS.model,
-                                                            FLAGS.output) )
-
-        step_ops = [global_step, loss, label_error, sequence_error]
-
-        with tf.Session(config=session_config) as sess:
-            
-            sess.run(init_op)
-            summary_writer.add_graph(sess.graph)
-
-            try:            
-                while True:
-                    restore_model(sess, _get_checkpoint()) 
-                    step_vals = sess.run(step_ops)
-                    print step_vals
-                    summary_str = sess.run(summary_op)
-                    summary_writer.add_summary(summary_str,step_vals[0])
-            except tf.errors.OutOfRangeError:
-                print('Done')"""
+    predictions = classifier.predict(input_fn=lambda: _get_input_stream())
+    print(next(predictions))
 
 if __name__ == '__main__':
     tf.app.run()
