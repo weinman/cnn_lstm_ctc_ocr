@@ -47,10 +47,6 @@ tf.app.flags.DEFINE_integer('num_input_threads',4,
 
 tf.logging.set_verbosity(tf.logging.WARN)
 
-
-# Non-configurable parameters
-#mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
-
 def _get_input_stream():
     """Set up and return image, label, width and text tensors"""
 
@@ -109,26 +105,6 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
         print(loss)
     return loss, label_error, sequence_error
 
-def _get_checkpoint():
-    """Get the checkpoint path from the given model output directory"""
-    ckpt = tf.train.get_checkpoint_state(FLAGS.model)
-
-    if ckpt and ckpt.model_checkpoint_path:
-        ckpt_path=ckpt.model_checkpoint_path
-    else:
-        raise RuntimeError('No checkpoint file found')
-
-    return ckpt_path
-
-def _get_init_trained():
-    """Return init function to restore trained model from a given checkpoint"""
-    saver_reader = tf.train.Saver(
-        tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-    )
-    
-    init_fn = lambda sess,ckpt_path: saver_reader.restore(sess, ckpt_path)
-    return init_fn
-
 def model_fn (features, labels, mode):
     """Model function for the estimator object"""
     
@@ -146,11 +122,12 @@ def model_fn (features, labels, mode):
         loss,label_error,sequence_error = _get_testing(
                 logits,sequence_length,label,length)
 
+        #Create homogeneity among the return values
         global_step = tf.convert_to_tensor(tf.train.get_or_create_global_step())
         global_step = tf.cast(global_step, tf.float32)
         sequence_error = tf.cast(sequence_error, tf.float32)
 
-        #Get the correct format to pass tp estimator spec
+        #Get the correct format to pass to estimator spec
         result = tf.convert_to_tensor([(tf.stack([global_step,
                                                   loss, 
                                                   label_error, 
@@ -172,7 +149,9 @@ def main(argv=None):
                                         config=custom_config)
 
     predictions = classifier.predict(input_fn=lambda: _get_input_stream())
-    print(next(predictions))
+
+    for items in predictions:
+        print(items)
 
 if __name__ == '__main__':
     tf.app.run()
