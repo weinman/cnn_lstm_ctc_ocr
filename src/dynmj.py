@@ -36,9 +36,8 @@ def bucketed_input_pipeline(base_dir=None,file_patterns=None,
                             batch_size=32,
                             boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
                             input_device=None,
-                            width_threshold=None,
-                            length_threshold=None,
-                            num_epoch=None):
+                            num_epoch=None,
+                            filter_fn=None):
     """Get input dataset with elements bucketed by image width
     Returns:
       image  : float32 image tensor [batch_size 32 ? 1] padded 
@@ -57,10 +56,8 @@ def bucketed_input_pipeline(base_dir=None,file_patterns=None,
                               num_parallel_calls=num_threads)
         
         # Remove input that doesn't fit necessary specifications
-        dataset = dataset.filter(
-            lambda image, width, label, length, text: 
-                _get_input_filter(width, width_threshold,
-                              length, length_threshold))
+        if filter_fn:
+            dataset = dataset.filter(filter_fn)
 
         # Bucket and batch appropriately
         dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
@@ -73,7 +70,7 @@ def bucketed_input_pipeline(base_dir=None,file_patterns=None,
             lambda image, width, label, length, text:
                 (image, 
                  width, 
-                 tf.contrib.layers.dense_to_sparse(label,0),
+                 tf.contrib.layers.dense_to_sparse(label,-1),
                  length, text),
             num_parallel_calls=num_threads).prefetch(1)
 
@@ -105,7 +102,7 @@ def threaded_input_pipeline(base_dir=None,file_patterns=None,
             lambda image, width, label, length, text: 
             (image, 
              width, 
-             tf.contrib.layers.dense_to_sparse(label,0),
+             tf.contrib.layers.dense_to_sparse(label,-1),
              length, 
              text),
             num_parallel_calls=num_threads)
@@ -173,7 +170,7 @@ def _text_to_labels(text): #TODO TEST
     # Note: MUST RUN tf.tables_initializer().run() in order for this to work
     table = tf.contrib.lookup.index_table_from_tensor(mapping=out_charset_tf,
                 num_oov_buckets=1,
-                default_value=-1)
+                default_value=0)
     labels = table.lookup(labels)
     return labels
 

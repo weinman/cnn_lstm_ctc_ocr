@@ -62,22 +62,35 @@ tf.app.flags.DEFINE_integer('width_threshold',None,
                             """Limit of input image width""")
 tf.app.flags.DEFINE_integer('length_threshold',None,
                             """Limit of input string length width""")
-
+tf.app.flags.DEFINE_integer('minimum_width',20,
+                            """Set the minimum image width""")
 tf.logging.set_verbosity(tf.logging.INFO)
 
 # Non-configurable parameters
 optimizer='Adam'
 mode = learn.ModeKeys.TRAIN # 'Configure' training mode for dropout layers
 
-def _get_input_stream():
-    """Set up and return image, label, and image width tensors"""
+def filter_by_width(image, width, label, length, text):
+    return tf.greater(width, FLAGS.minimum_width)
 
+def ctc_loss_filter(image, width, label, length, text):
+    seq_len = model.get_sequence_lengths(width)
+    return tf.greater(seq_len, 0)
+
+def _get_input_stream(filter_fn):
+    """
+    Set up and return image, label, and image width tensors
+    filter_fn must take the form:
+        filter_fn(image, width, label, length, text) : bool
+    """
+    
     dataset=dynmj.bucketed_input_pipeline(
         batch_size=FLAGS.batch_size,
         num_threads=FLAGS.num_input_threads,
         input_device=FLAGS.input_device,
-        width_threshold=FLAGS.width_threshold,
-        length_threshold=FLAGS.length_threshold )
+        #width_threshold=FLAGS.width_threshold,
+        #length_threshold=FLAGS.length_threshold,
+        filter_fn=filter_fn)
 
     return dataset.make_one_shot_iterator() 
 
@@ -165,19 +178,17 @@ def _get_init_pretrained():
 
 
 def main(argv=None):
-    
-    
-    
+
     with tf.Graph().as_default():
         global_step = tf.train.get_or_create_global_step()
 
-        input_stream = _get_input_stream()
+        input_stream = _get_input_stream(ctc_loss_filter)
         
         # Grab the next batch of data from input_stream 
         image, width, label, _, _ = input_stream.get_next()
 
         with tf.device(FLAGS.train_device):
-            features,sequence_length = model.convnet_layers( image, width, mode)
+            features,sequence_length = model.convnet_layers(image, width, mode)
             logits = model.rnn_layers( features, sequence_length,
                                        dynmj.num_classes() )
             train_op = _get_training(logits,label,sequence_length)
@@ -217,6 +228,6 @@ def main(argv=None):
                 if monitor.should_stop():
                     break
                 [step_loss,step]=sess.run([train_op, global_step])
-
+                
 if __name__ == '__main__':
     tf.app.run()

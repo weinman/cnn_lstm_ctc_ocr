@@ -32,18 +32,22 @@ def initialiseSynthesizers():
     s.setCursiveFonts(cursive_fonts)
 
 # Other functions
+out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 def run_test():
     global s
     #while True:
-    for _ in range(1000):
+    for _ in range(100000):
         caption,mat=s.generateSample()
+        print caption
+        print [out_charset.index(c) for c in list(caption)]
 
 def data_generator():
     global s
     initialiseSynthesizers()
     while True:
-        caption,mat = s.generateSample()
+        # caption, img
+        yield s.generateSample()
 
 # Main Program
 
