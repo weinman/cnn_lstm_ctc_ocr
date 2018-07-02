@@ -95,7 +95,8 @@ def threaded_input_pipeline(base_dir,file_patterns,
                             num_threads=4,
                             batch_size=32,
                             batch_device=None,
-                            preprocess_device=None):
+                            preprocess_device=None,
+                            num_epochs=None):
 
     # Get filenames into a dataset format
     filenames = tf.data.Dataset.from_tensor_slices(
@@ -115,23 +116,20 @@ def threaded_input_pipeline(base_dir,file_patterns,
     
     with tf.device(batch_device): # Create batch
 
-        # Hack -- probably a better way to do this! Just want dynamic padding!
-        # Pad batches to max data size (bucketing it all into the same bucket)
-        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length
-                                (element_length_func=_element_length_fn,
-                                 bucket_batch_sizes=[0, 10],
-                                 bucket_boundaries=[0]))
+        dataset = dataset.padded_batch(batch_size, 
+                                       padded_shapes=dataset.output_shapes)
 
         dataset = dataset.map(lambda image, 
                               width, label, 
                               length, text, filename: 
                               (image, width, 
-                               tf.cast(tf.deserialize_many_sparse(label, tf.int64), 
+                               tf.cast(tf.deserialize_many_sparse(label, 
+                                                                  tf.int64),
                                        tf.int32),
                                length, text, filename))
 
         # Repeat for num_epochs
-        #dataset = dataset.repeat(num_epochs)
+        dataset = dataset.repeat(num_epochs)
 
     return dataset
 
@@ -184,64 +182,6 @@ def _get_filenames(base_dir, file_patterns=['*.tfrecord']):
     data_files = [data_file for sublist in data_files for data_file in sublist]
 
     return data_files
-
-
-# Note: Currently not in use: probably more optimal than current implmntation
-def _text_to_labels(text):
-    """Convert given text (tf.string) into a list of tf.int32's"""
-    labels = tf.data.Dataset.from_tensor_slices(tf.string_split([text],""))
-    
-    # Converts ['A', 'B', 'C'] -> [0, 1, 2]
-    # Note: MUST RUN tf.tables_initializer().run() in order for this to work
-    table = tf.contrib.lookup.index_table_from_tensor(mapping=out_charset_tf,
-                                                      num_oov_buckets=1,
-                                                      default_value=-1)
-    labels = table.lookup(labels)
-    
-    return labels
-
-def _preprocess_dataset(caption, image, labels):
-    """Get everything how it should be"""
-
-    #NOTE: final image should be pre-grayed by opencv *before* generation
-    image = tf.image.rgb_to_grayscale(image) 
-    image = _preprocess_image(image)
-
-    width = tf.size(image[1]) 
-    # labels = _text_to_labels(caption) Not necessary with precomputed labels
-    length = tf.size(labels)
-    text = caption
-    return image, width, labels, length, text
-                
-"""
-def _parse_function(caption, image, labels):
-    Parse the elements of the dataset
-    
-    # Format elements appropriately
-    dataset = .map(_preprocess_dataset, num_parallel_calls=num_threads)
-
-    return dataset
-"""
-
-def _char_to_int(character):
-    """Convert given character (really tf.string of length 1) to its integer representation from out_charset"""
-    
-    tf.contrib.lookup.string_to_index(character, out_charset_tf) # default val -1
-    return out_charset.index(character)
-
-def _generator_wrapper():
-    """Compute the labels in python before everything becomes tensors
-       Note: very! SUBOPTIMAL-- Really should not be doing this in python
-       if we don't have to!!!"""
-    gen = data_generator()
-    while True:
-        data = next(gen)
-        caption = data[0]
-        image = data[1]
-
-        # Transform string text to sequence of indices using charset
-        labels = [out_charset.index(c) for c in list(caption)]
-        yield caption, image, labels
 
 def _parse_function(data):
     """Parse the elements of the dataset"""

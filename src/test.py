@@ -21,40 +21,20 @@ import cv2
 #import dynmj
 import mjsynth
 import model
-import numpy as np
+import model_fn
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('model','../data/model',
-                          """Directory for model checkpoints""")
-tf.app.flags.DEFINE_string('output','test',
-                          """Sub-directory of model for test summary events""")
-
-tf.app.flags.DEFINE_integer('batch_size',2**8,
-                            """Eval batch size""")
-tf.app.flags.DEFINE_integer('test_interval_secs', 60,
-                             'Time between test runs')
-
-tf.app.flags.DEFINE_string('device','/gpu:0',
-                          """Device for graph placement""")
-
-tf.app.flags.DEFINE_string('test_path','../data/',
-                           """Base directory for test/validation data""")
-tf.app.flags.DEFINE_string('filename_pattern','val/words-*',
-                           """File pattern for input data""")
-tf.app.flags.DEFINE_integer('num_input_threads',4,
-                          """Number of readers for input data""")
-
-tf.logging.set_verbosity(tf.logging.WARN)
+optimizer = 'Adam'
 
 def _get_input_stream():
     """Set up and return image, label, width and text tensors"""
 
     dataset=mjsynth.threaded_input_pipeline(
         FLAGS.test_path, 
-        str.split(FLAGS.filename_pattern,','),
-        batch_size=FLAGS.batch_size,
-        num_threads=FLAGS.num_input_threads,
+        str.split(FLAGS.filename_pattern_testing,','),
+        batch_size=FLAGS.testing_batch_size,
+        num_threads=FLAGS.num_input_threads_testing,
         batch_device=FLAGS.device,
         preprocess_device=FLAGS.device)
 
@@ -63,7 +43,8 @@ def _get_input_stream():
     image, width, label, length, _, _ = iterator.get_next()
 
     # The input for the model function 
-    features = {"image": image, "width": width, "length": length, "label": label}
+    features = {"image": image, "width": width, "length": length, "label": label, 
+                "optimizer": optimizer}
     return features, label
 
 def _get_session_config():
@@ -74,69 +55,7 @@ def _get_session_config():
 
     return config
 
-def _get_testing(rnn_logits,sequence_length,label,label_length):
-    """Create ops for testing (all scalars): 
-       loss: CTC loss function value, 
-       label_error:  Batch-normalized edit distance on beam search max
-       sequence_error: Batch-normalized sequence error rate
-    """
-    with tf.name_scope("train"):
-        loss = model.ctc_loss_layer(rnn_logits,label,sequence_length) 
-    with tf.name_scope("test"):
-        predictions,_ = tf.nn.ctc_beam_search_decoder(rnn_logits, 
-                                                   sequence_length,
-                                                   beam_width=128,
-                                                   top_paths=1,
-                                                   merge_repeated=True)
-        hypothesis = tf.cast(predictions[0], tf.int32) # for edit_distance
-        label_errors = tf.edit_distance(hypothesis, label, normalize=False)
-        sequence_errors = tf.count_nonzero(label_errors,axis=0)
-        total_label_error = tf.reduce_sum( label_errors )
-        total_labels = tf.reduce_sum( label_length )
-        label_error = tf.truediv( total_label_error, 
-                                  tf.cast(total_labels, tf.float32 ),
-                                  name='label_error')
-        sequence_error = tf.truediv( tf.cast( sequence_errors, tf.int32 ),
-                                     tf.shape(label_length)[0],
-                                     name='sequence_error')
-        tf.summary.scalar( 'loss', loss )
-        tf.summary.scalar( 'label_error', label_error )
-        tf.summary.scalar( 'sequence_error', sequence_error )
-        print(loss)
-    return loss, label_error, sequence_error
 
-def model_fn (features, labels, mode):
-    """Model function for the estimator object"""
-    
-    with tf.device(FLAGS.device):
-
-        image = features['image']
-        width = features['width']
-        length = features['length']
-        label = features['label']
-
-        features,sequence_length = model.convnet_layers( image, width, mode)
-        logits = model.rnn_layers(features, sequence_length,
-                                       mjsynth.num_classes())
-
-        loss,label_error,sequence_error = _get_testing(
-                logits,sequence_length,label,length)
-
-        #Create homogeneity among the return values
-        global_step = tf.convert_to_tensor(tf.train.get_or_create_global_step())
-        global_step = tf.cast(global_step, tf.float32)
-        sequence_error = tf.cast(sequence_error, tf.float32)
-
-        #Get the correct format to pass to estimator spec
-        result = tf.convert_to_tensor([(tf.stack([global_step,
-                                                  loss, 
-                                                  label_error, 
-                                                  sequence_error], axis=0))])
-
-    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, 
-                                      predictions=result, 
-                                      train_op=None)
-    
 def main(argv=None):
 
     custom_config = tf.estimator.RunConfig(session_config=_get_session_config())
@@ -144,12 +63,13 @@ def main(argv=None):
    
 
     # Initialize the classifier
-    classifier = tf.estimator.Estimator(model_fn=model_fn, 
+    classifier = tf.estimator.Estimator(model_fn=model_fn.model_fn, 
                                         model_dir=FLAGS.model,
                                         config=custom_config)
 
     predictions = classifier.predict(input_fn=lambda: _get_input_stream())
 
+    # Iterate through the generator object
     for items in predictions:
         print(items)
 
