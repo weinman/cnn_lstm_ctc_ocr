@@ -47,16 +47,20 @@ def bucketed_input_pipeline(base_dir,file_patterns,
     filenames = tf.data.Dataset.from_tensor_slices(
         _get_filenames(base_dir, file_patterns))
 
-    # TODO: Think about sharding if we're going to have multiple processors?    
     with tf.device(input_device): # Create bucketing batcher
         
         dataset = tf.data.TFRecordDataset(filenames, 
                                           num_parallel_reads=num_threads,
                                           buffer_size=capacity)
-        
+        dataset = filenames.apply(
+            tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
+                                                cycle_length=num_threads,  
+                                                sloppy=True))
+        dataset = dataset.prefetch(capacity)
         # Preprocess
         dataset = dataset.map(_parse_function, num_parallel_calls=num_threads)
-        
+        dataset = dataset.prefetch(capacity)
+
         # Filter out inappropriately dimension-ed elements
         if(width_threshold != None or length_threshold != None):
             dataset = dataset.filter(
@@ -72,7 +76,8 @@ def bucketed_input_pipeline(base_dir,file_patterns,
             bucket_boundaries=boundaries))
 
         # Repeat for num_epochs
-        dataset = dataset.repeat(num_epoch)
+        if num_epoch:
+            dataset = dataset.repeat(num_epoch)
 
         # Deserialize sparse tensor
         dataset = dataset.map(
