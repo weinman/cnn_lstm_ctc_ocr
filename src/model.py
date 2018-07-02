@@ -117,12 +117,16 @@ def rnn_layer(bottom_sequence,sequence_length,rnn_size,scope):
     """Build bidirectional (concatenated output) RNN layer"""
 
     weight_initializer = tf.truncated_normal_initializer(stddev=0.01)
-    
-    # Default activation is tanh
-    cell_fw = tf.contrib.rnn.LSTMCell( rnn_size, 
-                                       initializer=weight_initializer)
-    cell_bw = tf.contrib.rnn.LSTMCell( rnn_size, 
-                                       initializer=weight_initializer)
+
+    cell_fw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell( rnn_size )
+    cell_bw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell( rnn_size )
+
+    # Pre-CUDNN (slower) alternatve. Default activation is tanh .
+    #cell_fw = tf.contrib.rnn.LSTMCell( rnn_size, 
+    #                                   initializer=weight_initializer)
+    #cell_bw = tf.contrib.rnn.LSTMCell( rnn_size, 
+    #                                   initializer=weight_initializer)
+
     # Include?
     #cell_fw = tf.contrib.rnn.DropoutWrapper( cell_fw, 
     #                                         input_keep_prob=dropout_rate )
