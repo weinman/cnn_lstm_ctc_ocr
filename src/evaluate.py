@@ -94,19 +94,28 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
         batch_size = tf.cast( batch_size, tf.int64 )
 
         # Variables to tally across batches (all initially zero)
+
+        # Make sure the variables are local so the Saver doesn't try to read them
+        # from the saved model checkpoint
+        var_collections=[tf.GraphKeys.LOCAL_VARIABLES]
+
         total_num_label_errors = tf.Variable(0, trainable=False,
                                              name='total_num_label_errors',
-                                             dtype=tf.int64)
+                                             dtype=tf.int64,
+                                             collections=var_collections)
         total_num_sequence_errors = tf.Variable(0, trainable=False,
                                                 name='total_num_sequence_errors',
-                                                dtype=tf.int64)
+                                                dtype=tf.int64,
+                                                collections=var_collections)
         total_num_labels =  tf.Variable(0, trainable=False,
                                         name='total_num_labels',
-                                        dtype=tf.int64)
+                                        dtype=tf.int64,
+                                        collections=var_collections)
 
         total_num_sequences =  tf.Variable(0, trainable=False,
                                            name='total_num_sequences',
-                                           dtype=tf.int64)
+                                           dtype=tf.int64,
+                                           collections=var_collections)
 
         # Create the "+=" update ops and group together as one
         update_label_errors    = tf.assign_add( total_num_label_errors,
@@ -152,13 +161,10 @@ def _get_checkpoint():
 def _get_init_trained():
     """Return init function to restore trained model from a given checkpoint"""
 
-    # Gross hack so the saver doesn't try to load the tally variables. Improvable?
     saver_reader = tf.train.Saver(
-        [var for var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) 
-         if "eval" not in var.name]
+        tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
     )
-        #tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-    #)
+
     
     init_fn = lambda sess,ckpt_path: saver_reader.restore(sess, ckpt_path)
     return init_fn
