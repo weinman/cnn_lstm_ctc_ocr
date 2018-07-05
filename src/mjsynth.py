@@ -16,6 +16,7 @@
 
 import os
 import tensorflow as tf
+import numpy as np
 
 # The list (well, string) of valid output characters
 # If any example contains a character not found here, an error will result
@@ -24,6 +25,32 @@ out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 def num_classes():
     return len(out_charset)
+
+def get_strings(labels):
+    """
+    Transform a SparseTensorValue matrix of labels into the corresponding
+    list of character strings
+    """
+    num_strings = labels.dense_shape[0]
+    
+    strings = []
+
+    for row in range(num_strings):
+
+        indices = np.where( labels.indices[:,0]==row )[0]
+        indices.shape = (indices.shape[0], 1)
+
+        label = labels.values[indices]
+        label.shape = (label.shape[0],)
+
+        strings.append( get_string( label ))
+
+    return strings
+
+def get_string(labels):
+    """Transform an 1D array of labels into the corresponding character string"""
+    string = ''.join([out_charset[c] for c in labels])
+    return string
 
 def bucketed_input_pipeline(base_dir,file_patterns,
                             num_threads=4,

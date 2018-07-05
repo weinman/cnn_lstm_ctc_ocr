@@ -26,7 +26,8 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string('model','../data/model',
                           """Directory for model checkpoints""")
-
+tf.app.flags.DEFINE_bool('verbose',False,
+                         """Print all predictions, ground truth, and filenames""")
 tf.app.flags.DEFINE_integer('batch_size',2**9,
                             """Eval batch size""")
 
@@ -49,14 +50,14 @@ mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
 def _get_input():
     """Set up and return image, label, width and text tensors"""
 
-    image,width,label,length,text,filename=mjsynth.threaded_input_pipeline(
+    image,width,label,length,text,filename=mjsynth.bucketed_input_pipeline(
         FLAGS.test_path,
         str.split(FLAGS.filename_pattern,','),
         batch_size=FLAGS.batch_size,
         num_threads=FLAGS.num_input_threads,
         num_epochs=1 )
     
-    return image,width,label,length
+    return image,width,label,length,text,filename
 
 def _get_session_config():
     """Setup session config to soften device placement"""
@@ -71,7 +72,7 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
        label_error:  Normalized edit distance on beam search max
        sequence_error: Normalized sequence error rate
     """
-    with tf.name_scope("eval"):
+    with tf.name_scope("evaluate"):
         predictions,_ = tf.nn.ctc_beam_search_decoder(rnn_logits, 
                                                    sequence_length,
                                                    beam_width=128,
@@ -87,7 +88,7 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
         batch_num_labels = tf.reduce_sum( label_length )
         batch_size = tf.shape(label_length)[0]
 
-        # Wide unsigned integer type casts
+        # Wide integer type casts (prefer unsigned, but truediv dislikes those)
         batch_num_label_errors = tf.cast( batch_num_label_errors, tf.int64 )
         batch_num_sequence_errors = tf.cast( batch_num_sequence_errors, tf.int64)
         batch_num_labels = tf.cast( batch_num_labels, tf.int64 )
@@ -145,10 +146,12 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
                                      total_num_sequences,
                                      name='sequence_error')
                    
-    return label_error, sequence_error, update_metrics, metrics
+    return label_error, sequence_error, update_metrics, metrics, predictions
 
-def _get_checkpoint():
-    """Get the checkpoint path from the given model output directory"""
+def _restore_model(sess):
+    """Restore trained model from the current checkpoint"""
+
+    # Get the checkpoint path from the given model output directory
     ckpt = tf.train.get_checkpoint_state(FLAGS.model)
 
     if ckpt and ckpt.model_checkpoint_path:
@@ -156,18 +159,13 @@ def _get_checkpoint():
     else:
         raise RuntimeError('No checkpoint file found')
 
-    return ckpt_path
-
-def _get_init_trained():
-    """Return init function to restore trained model from a given checkpoint"""
-
+    # Instantiate reader and do restoration
     saver_reader = tf.train.Saver(
         tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
     )
+    saver_reader.restore(sess, ckpt_path)
 
-    
-    init_fn = lambda sess,ckpt_path: saver_reader.restore(sess, ckpt_path)
-    return init_fn
+
 
 def main(argv=None):
 
@@ -175,15 +173,17 @@ def main(argv=None):
 
         with tf.device(FLAGS.device):
 
-            image,width,label,length = _get_input()
+            image,width,label,length,text,filename = _get_input()
             features,sequence_length = model.convnet_layers( image, width, mode)
             logits = model.rnn_layers( features, sequence_length,
                                        mjsynth.num_classes() )
-            label_error,sequence_error,update_metrics,metrics = _get_testing(
-                logits,sequence_length,label,length)
+            
+            test_ops = _get_testing( logits, sequence_length, label, length)
+
+            [label_error,sequence_error,update_metrics,metrics,predictions] = \
+                test_ops
 
         session_config = _get_session_config()
-        restore_model = _get_init_trained()
 
         init_op = tf.group( tf.global_variables_initializer(),
                             tf.local_variables_initializer()) 
@@ -195,11 +195,18 @@ def main(argv=None):
             coord = tf.train.Coordinator() # Launch reader threads
             threads = tf.train.start_queue_runners(sess=sess,coord=coord)
             
-            restore_model(sess, _get_checkpoint()) # Get latest checkpoint
+            _restore_model(sess) # Get latest checkpoint
 
             try:            
                 while not coord.should_stop():
-                    sess.run(update_metrics)
+                    if FLAGS.verbose:
+                        [upd,fnames,gt_txts,pred]= sess.run(
+                            [update_metrics, filename, text, predictions])
+                        strings = mjsynth.get_strings(pred[0])
+                        for fname,gt_txt,string in zip(fnames,gt_txts,strings):
+                            print string,gt_txt,fname
+                    else:
+                         sess.run(update_metrics)
             except tf.errors.OutOfRangeError:
                 # Indicates that the single epoch is complete.
                 0 # NOP

@@ -131,11 +131,6 @@ def _get_init_trained():
     init_fn = lambda sess,ckpt_path: saver_reader.restore(sess, ckpt_path)
     return init_fn
 
-def _get_string(labels):
-    """Transform an 1D array of labels into the corresponding character string"""
-    string = ''.join([mjsynth.out_charset[c] for c in labels])
-    return string
-
 def _get_dictionary_tensor(dictionary_path, charset):
     return tf.sparse_tensor_to_dense(tf.to_int32(
 	dictionary_from_file(dictionary_path, charset)))
@@ -173,7 +168,7 @@ def main(argv=None):
                 # Get prediction for single image (isa SparseTensorValue)
                 [output] = sess.run(prediction,{ image: image_data, 
                                                  width: image_data.shape[1]} )
-                print(_get_string(output.values))
+                print(mjsynth.get_string(output.values))
 
 if __name__ == '__main__':
     tf.app.run()
