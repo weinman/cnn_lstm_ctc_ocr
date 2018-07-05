@@ -110,14 +110,10 @@ def threaded_input_pipeline(base_dir,file_patterns,
         dataset = dataset.map(_parse_function, num_parallel_calls=num_threads)
     
     with tf.device(batch_device): # Create batch queue
-
-        # Hack -- probably a better way to do this! Just want dynamic padding!
-        # Pad batches to max data size (bucketing it all into the same bucket)
-        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
-                       element_length_func=_element_length_fn,
-                       bucket_batch_sizes=[batch_size, batch_size],
-                       bucket_boundaries=[0]))
-
+        
+        # Dynamically pad batches to match largest in batch
+        dataset = dataset.padded_batch(batch_size, 
+                                       padded_shapes=dataset.output_shapes)
         # Deserialize sparse tensors
         dataset = dataset.map(
             lambda image, width, label, length, text, filename: 
