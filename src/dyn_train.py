@@ -70,6 +70,7 @@ tf.logging.set_verbosity(tf.logging.INFO)
 optimizer='Adam'
 mode = learn.ModeKeys.TRAIN # 'Configure' training mode for dropout layers
 
+<<<<<<< HEAD:src/dyn_train.py
 def filter_by_width(image, width, label, length, text):
     return tf.greater(width, FLAGS.minimum_width)
 
@@ -91,14 +92,39 @@ def _get_input_stream(filter_fn):
         #width_threshold=FLAGS.width_threshold,
         #length_threshold=FLAGS.length_threshold,
         filter_fn=filter_fn)
+=======
+def _get_input_stream():
+    """Set up and return image, label, and image width tensors"""
+    print("Getting input stream...")
+    dataset=mjsynth.bucketed_input_pipeline(
+        FLAGS.train_path, 
+        str.split(FLAGS.filename_pattern,','),
+        batch_size=FLAGS.batch_size,
+        num_threads=FLAGS.num_input_threads,
+        input_device=FLAGS.input_device,
+        width_threshold=FLAGS.width_threshold,
+        length_threshold=FLAGS.length_threshold )
+    
+    return dataset.make_one_shot_iterator()
+>>>>>>> origin/dataset_changes:src/train.py
 
     return dataset.make_one_shot_iterator() 
 
+<<<<<<< HEAD:src/dyn_train.py
 
 def _get_single_input_stream():    
     """Set up and return image, label, and width tensors"""
 
     dataset=dynmj.threaded_input_pipeline(
+=======
+def _get_single_input_stream():
+    
+    """Set up and return image, label, and width tensors"""
+
+    dataset=mjsynth.threaded_input_pipeline(
+        deps.get('records'), 
+        str.split(FLAGS.filename_pattern,','),
+>>>>>>> origin/dataset_changes:src/train.py
         batch_size=1,
         num_threads=FLAGS.num_input_threads,
         num_epochs=1,
@@ -180,12 +206,17 @@ def _get_init_pretrained():
 def main(argv=None):
 
     with tf.Graph().as_default():
+        input_stream = _get_input_stream()
         global_step = tf.train.get_or_create_global_step()
 
+<<<<<<< HEAD:src/dyn_train.py
         input_stream = _get_input_stream(ctc_loss_filter)
         
         # Grab the next batch of data from input_stream 
         image, width, label, _, _ = input_stream.get_next()
+=======
+        image, width, label, _, _, _ = input_stream.get_next()
+>>>>>>> origin/dataset_changes:src/train.py
 
         with tf.device(FLAGS.train_device):
             features,sequence_length = model.convnet_layers(image, width, mode)

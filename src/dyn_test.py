@@ -49,6 +49,10 @@ tf.logging.set_verbosity(tf.logging.WARN)
 # Non-configurable parameters
 mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
 
+<<<<<<< HEAD:src/dyn_test.py
+=======
+
+>>>>>>> origin/dataset_changes:src/test.py
 def _get_input_stream():
     """Set up and return image, label, width and text tensors"""
 
@@ -56,10 +60,16 @@ def _get_input_stream():
         batch_size=FLAGS.batch_size,
         num_threads=FLAGS.num_input_threads,
         batch_device=FLAGS.device, 
+<<<<<<< HEAD:src/dyn_test.py
         preprocess_device=FLAGS.device)
 
     return dataset.make_one_shot_iterator()
 
+=======
+        preprocess_device=FLAGS.device )
+    
+    return dataset.make_one_shot_iterator()
+>>>>>>> origin/dataset_changes:src/test.py
 
 def _get_session_config():
     """Setup session config to soften device placement"""
@@ -122,12 +132,18 @@ def _get_init_trained():
 
 def main(argv=None):
     
+<<<<<<< HEAD:src/dyn_test.py
 
     with tf.Graph().as_default():
         input_stream = _get_input_stream()
 
         # Get the next batch
         image,width,label,length, _ = input_stream.get_next()
+=======
+    with tf.Graph().as_default():
+        input_stream = _get_input_stream()
+        image,width,label,length,_, _ = input_stream.get_next()
+>>>>>>> origin/dataset_changes:src/test.py
 
         with tf.device(FLAGS.device):
             features,sequence_length = model.convnet_layers( image, width, mode)
@@ -157,11 +173,22 @@ def main(argv=None):
 
             try:            
                 while True:
+<<<<<<< HEAD:src/dyn_test.py
                     restore_model(sess, _get_checkpoint()) 
+=======
+                    # Get latest checkpoint
+                    restore_model(sess, _get_checkpoint()) 
+                    
+>>>>>>> origin/dataset_changes:src/test.py
                     step_vals = sess.run(step_ops)
                     print step_vals
+                    
                     summary_str = sess.run(summary_op)
                     summary_writer.add_summary(summary_str,step_vals[0])
+<<<<<<< HEAD:src/dyn_test.py
+=======
+
+>>>>>>> origin/dataset_changes:src/test.py
             except tf.errors.OutOfRangeError:
                 print('Done')
 
