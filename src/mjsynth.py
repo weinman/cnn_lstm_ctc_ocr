@@ -52,10 +52,6 @@ def bucketed_input_pipeline(base_dir,file_patterns,
         dataset = tf.data.TFRecordDataset(filenames, 
                                           num_parallel_reads=num_threads,
                                           buffer_size=capacity)
-        dataset = filenames.apply(
-            tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset,
-                                                cycle_length=num_threads,  
-                                                sloppy=True))
         dataset = dataset.prefetch(capacity)
         # Preprocess
         dataset = dataset.map(_parse_function, num_parallel_calls=num_threads)
