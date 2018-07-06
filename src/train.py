@@ -18,8 +18,9 @@ import os
 import tensorflow as tf
 from tensorflow.contrib import learn
 
-import dynmj
+import pipeline
 import model
+import filters
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -51,7 +52,8 @@ tf.app.flags.DEFINE_string('train_device','/gpu:1',
                            """Device for training graph placement""")
 tf.app.flags.DEFINE_string('input_device','/gpu:0',
                            """Device for preprocess/batching graph placement""")
-
+tf.app.flags.DEFINE_boolean('static_data', True,
+                            """Whether to use static data (false for dynamic data)""")
 tf.app.flags.DEFINE_string('train_path','../data/train/',
                            """Base directory for training data""")
 tf.app.flags.DEFINE_string('filename_pattern','words-*',
@@ -70,69 +72,21 @@ tf.logging.set_verbosity(tf.logging.INFO)
 optimizer='Adam'
 mode = learn.ModeKeys.TRAIN # 'Configure' training mode for dropout layers
 
-<<<<<<< HEAD:src/dyn_train.py
-def filter_by_width(image, width, label, length, text):
-    return tf.greater(width, FLAGS.minimum_width)
-
-def ctc_loss_filter(image, width, label, length, text):
-    seq_len = model.get_sequence_lengths(width)
-    return tf.greater(seq_len, 0)
-
-def _get_input_stream(filter_fn):
-    """
-    Set up and return image, label, and image width tensors
-    filter_fn must take the form:
-        filter_fn(image, width, label, length, text) : bool
-    """
-    
-    dataset=dynmj.bucketed_input_pipeline(
-        batch_size=FLAGS.batch_size,
-        num_threads=FLAGS.num_input_threads,
-        input_device=FLAGS.input_device,
-        #width_threshold=FLAGS.width_threshold,
-        #length_threshold=FLAGS.length_threshold,
-        filter_fn=filter_fn)
-=======
-def _get_input_stream():
-    """Set up and return image, label, and image width tensors"""
-    print("Getting input stream...")
-    dataset=mjsynth.bucketed_input_pipeline(
-        FLAGS.train_path, 
-        str.split(FLAGS.filename_pattern,','),
-        batch_size=FLAGS.batch_size,
-        num_threads=FLAGS.num_input_threads,
-        input_device=FLAGS.input_device,
-        width_threshold=FLAGS.width_threshold,
-        length_threshold=FLAGS.length_threshold )
-    
-    return dataset.make_one_shot_iterator()
->>>>>>> origin/dataset_changes:src/train.py
-
-    return dataset.make_one_shot_iterator() 
-
-<<<<<<< HEAD:src/dyn_train.py
-
-def _get_single_input_stream():    
-    """Set up and return image, label, and width tensors"""
-
-    dataset=dynmj.threaded_input_pipeline(
-=======
-def _get_single_input_stream():
-    
-    """Set up and return image, label, and width tensors"""
-
-    dataset=mjsynth.threaded_input_pipeline(
-        deps.get('records'), 
-        str.split(FLAGS.filename_pattern,','),
->>>>>>> origin/dataset_changes:src/train.py
-        batch_size=1,
-        num_threads=FLAGS.num_input_threads,
-        num_epochs=1,
-        batch_device=FLAGS.input_device, 
-        preprocess_device=FLAGS.input_device )
-
-    return dataset.make_one_shot_iterator()
-
+def get_data_iterator():
+    if(FLAGS.static_data):
+        ds = pipeline.get_static_data(FLAGS.train_path, 
+                                      str.split(FLAGS.filename_pattern,','),
+                                      num_threads=FLAGS.num_input_threads,
+                                      batch_size=FLAGS.batch_size,
+                                      input_device=FLAGS.input_device,
+                                      filter_fn=None)
+                                    
+    else:
+        ds = pipeline.get_dynamic_data(num_threads=FLAGS.num_input_threads,
+                                       batch_size=FLAGS.batch_size,
+                                       input_device=FLAGS.input_device,
+                                       filter_fn=filters.dyn_filter_by_width)
+    return ds.make_one_shot_iterator()
 
 def _get_training(rnn_logits,label,sequence_length):
     """Set up training ops"""
@@ -206,22 +160,19 @@ def _get_init_pretrained():
 def main(argv=None):
 
     with tf.Graph().as_default():
-        input_stream = _get_input_stream()
+        input_stream = get_data_iterator()
         global_step = tf.train.get_or_create_global_step()
 
-<<<<<<< HEAD:src/dyn_train.py
-        input_stream = _get_input_stream(ctc_loss_filter)
-        
-        # Grab the next batch of data from input_stream 
-        image, width, label, _, _ = input_stream.get_next()
-=======
-        image, width, label, _, _, _ = input_stream.get_next()
->>>>>>> origin/dataset_changes:src/train.py
+        # Kinda gross... dynamic data doesn't have a filename element to unpack
+        if(FLAGS.static_data):
+            image, width, label, _, _, _ = input_stream.get_next()
+        else:
+            image, width, label, _, _ = input_stream.get_next()
 
         with tf.device(FLAGS.train_device):
             features,sequence_length = model.convnet_layers(image, width, mode)
-            logits = model.rnn_layers( features, sequence_length,
-                                       dynmj.num_classes() )
+            logits = model.rnn_layers(features, sequence_length,
+                                       pipeline.num_classes())
             train_op = _get_training(logits,label,sequence_length)
 
         session_config = _get_session_config()

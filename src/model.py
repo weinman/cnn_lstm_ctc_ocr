@@ -94,24 +94,30 @@ def convnet_layers(inputs, widths, mode):
         pool8 = tf.layers.max_pooling2d( conv8, [3,1], [3,1], 
                                    padding='valid', name='pool8') # 1,13
         features = tf.squeeze(pool8, axis=1, name='features') # squeeze row dim
-
-        kernel_sizes = [ params[1] for params in layer_params]
-
-        # Calculate resulting sequence length from original image widths
-        conv1_trim = tf.constant( 2 * (kernel_sizes[0] // 2),
-                                  dtype=tf.int32,
-                                  name='conv1_trim')
-        one = tf.constant(1, dtype=tf.int32, name='one')
-        two = tf.constant(2, dtype=tf.int32, name='two')
-        after_conv1 = tf.subtract( widths, conv1_trim)
-        after_pool2 = tf.floor_div( after_conv1, two )
-        after_pool4 = tf.subtract(after_pool2, one)
-        after_pool6 = tf.subtract(after_pool4, one) 
-        after_pool8 = after_pool6
-
-        sequence_length = tf.reshape(after_pool8,[-1], name='seq_len') # Vectorize
+        
+        # Get sequence lengths
+        sequence_length = get_sequence_lengths(widths)
+        
+        # Vectorize
+        sequence_length = tf.reshape(sequence_length,[-1], name='seq_len') 
 
         return features,sequence_length
+
+def get_sequence_lengths(widths):    
+    kernel_sizes = [ params[1] for params in layer_params]
+
+    # Calculate resulting sequence length from original image widths
+    conv1_trim = tf.constant( 2 * (kernel_sizes[0] // 2),
+                              dtype=tf.int32,
+                              name='conv1_trim')
+    one = tf.constant(1, dtype=tf.int32, name='one')
+    two = tf.constant(2, dtype=tf.int32, name='two')
+    after_conv1 = tf.subtract( widths, conv1_trim)
+    after_pool2 = tf.floor_div( after_conv1, two )
+    after_pool4 = tf.subtract(after_pool2, one)
+    after_pool6 = tf.subtract(after_pool4, one) 
+    after_pool8 = after_pool6
+    return after_pool8
 
 def rnn_layer(bottom_sequence,sequence_length,rnn_size,scope):
     """Build bidirectional (concatenated output) RNN layer"""

@@ -18,11 +18,11 @@ import os
 import tensorflow as tf
 import numpy as np
 from map_generator import data_generator
-
+import pipeline
 # The list (well, string) of valid output characters
 # If any example contains a character not found here, an error will result
 # from the calls to .index in the decoder below
-out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+out_charset=pipeline.out_charset
 
 # Get a sparse tensor for table lookup in the tensorflow runtime
 out_charset_tf=tf.string_split([tf.constant(
@@ -31,13 +31,11 @@ out_charset_tf=tf.string_split([tf.constant(
 def num_classes():
     return len(out_charset)
 
-def bucketed_input_pipeline(base_dir=None,file_patterns=None,
-                            num_threads=4,
-                            batch_size=32,
-                            boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
-                            input_device=None,
-                            num_epoch=None,
-                            filter_fn=None):
+def get_data(num_threads=4,
+             batch_size=32,
+             boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
+             input_device=None,
+             filter_fn=None):
     """Get input dataset with elements bucketed by image width
     Returns:
       image  : float32 image tensor [batch_size 32 ? 1] padded 
@@ -47,23 +45,30 @@ def bucketed_input_pipeline(base_dir=None,file_patterns=None,
       length : Length of label sequence (text length)
       text   : Human readable string for the image
     """
+    # Elements to be buffered
+    num_buffered_elements = num_threads*batch_size*2
 
-    dataset = _get_dataset()
-
-    with tf.device(input_device): # Create bucketing batcher
-
+    dataset = _get_dataset().prefetch(num_buffered_elements)
+    
+    with tf.device(input_device):
         dataset = dataset.map(_preprocess_dataset, 
                               num_parallel_calls=num_threads)
-        
+        dataset = dataset.prefetch(num_buffered_elements)
+
         # Remove input that doesn't fit necessary specifications
         if filter_fn:
             dataset = dataset.filter(filter_fn)
 
         # Bucket and batch appropriately
-        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
-                      element_length_func=_element_length_fn,
-                      bucket_batch_sizes=np.full(len(boundaries)+1, batch_size),
-                      bucket_boundaries=boundaries))
+        if boundaries:
+            dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
+                element_length_func=_element_length_fn,
+                bucket_batch_sizes=np.full(len(boundaries)+1, batch_size),
+                bucket_boundaries=boundaries))
+        else:
+            # Dynamically pad batches to match largest in batch
+            dataset = dataset.padded_batch(batch_size, 
+                                           padded_shapes=dataset.output_shapes)
 
         # Convert labels to sparse tensor for CNN purposes
         dataset = dataset.map(
@@ -72,83 +77,14 @@ def bucketed_input_pipeline(base_dir=None,file_patterns=None,
                  width, 
                  tf.contrib.layers.dense_to_sparse(label,-1),
                  length, text),
-            num_parallel_calls=num_threads).prefetch(1)
-
-    return dataset
-
-def threaded_input_pipeline(base_dir=None,file_patterns=None,
-                            num_threads=4,
-                            batch_size=32,
-                            batch_device=None,
-                            preprocess_device=None):
-
-    dataset = _get_dataset()
-
-    with tf.device(preprocess_device):
-        dataset = dataset.map(_preprocess_dataset,
-                              num_parallel_calls=num_threads)
-    
-    with tf.device(batch_device): # Create batch
-
-        # Hack -- probably a better way to do this! Just want dynamic padding!
-        # Pad batches to max data size (bucketing it all into the same bucket)
-        dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
-                       element_length_func=_element_length_fn,
-                       bucket_batch_sizes=[batch_size, batch_size],
-                       bucket_boundaries=[0]))
-
-        # Convert to sparse tensor for CNN purposes
-        dataset = dataset.map(
-            lambda image, width, label, length, text: 
-            (image, 
-             width, 
-             tf.contrib.layers.dense_to_sparse(label,-1),
-             length, 
-             text),
             num_parallel_calls=num_threads)
-
-        dataset = dataset.prefetch(1)
-
-    return dataset.prefetch(1)
+        
+        # Prefetch some more
+        dataset = dataset.prefetch(8)
+    return dataset
 
 def _element_length_fn(image, width, label, length, text):
     return width
-
-def dataset_element_length_fn(_, image):
-    return tf.shape(image)[2]
-
-def _get_input_filter(width, width_threshold, length, length_threshold):
-    """Boolean op for discarding input data based on string or image size
-    Input:
-      width            : Tensor representing the image width
-      width_threshold  : Python numerical value (or None) representing the 
-                         maximum allowable input image width 
-      length           : Tensor representing the ground truth string length
-      length_threshold : Python numerical value (or None) representing the 
-                         maximum allowable input string length
-   Returns:
-      keep_input : Boolean Tensor indicating whether to keep a given input 
-                  with the specified image width and string length
-"""
-
-    keep_input = None
-
-    if width_threshold!=None:
-        keep_input = tf.less_equal(width, width_threshold)
-
-    if length_threshold!=None:
-        length_filter = tf.less_equal(length, length_threshold)
-        if keep_input==None:
-            keep_input = length_filter 
-        else:
-            keep_input = tf.logical_and( keep_input, length_filter)
-
-    if keep_input==None:
-        keep_input = True
-    else:
-        keep_input = tf.reshape( keep_input, [] ) # explicitly make a scalar
-
-    return keep_input
 
 def _get_dataset():
     """
@@ -161,8 +97,8 @@ def _get_dataset():
                (tf.TensorShape((32, None, 3))), # Shape 2nd element
                (tf.TensorShape([None]))))       # Shape 3rd element
 
-# Note: Currently not in use: probably more optimal than current implmntation
-def _text_to_labels(text): #TODO TEST
+# Note: Currently not in use: probably more optimal than current implementation
+def _text_to_labels(text):
     """Convert given text (tf.string) into a list of tf.int32's"""
     labels = tf.data.Dataset.from_tensor_slices(tf.string_split([text],""))
     
@@ -181,6 +117,7 @@ def _preprocess_dataset(caption, image, labels):
     image = tf.image.rgb_to_grayscale(image) 
     image = _preprocess_image(image)
 
+    # Width is the 2nd element of the image tuple
     width = tf.size(image[1]) 
     # labels = _text_to_labels(caption) Not necessary with precomputed labels
     # labels = tf.contrib.layers.dense_to_sparse(labels,0) if possible
@@ -191,8 +128,7 @@ def _preprocess_dataset(caption, image, labels):
 def _generator_wrapper():
     """
     Compute the labels in python before everything becomes tensors
-    Note: very! SUBOPTIMAL-- Really should not be doing this in python
-    if we don't have to!!!
+    Note: Really should not be doing this in python if we don't have to!!!
     """
     gen = data_generator()
     while True:
