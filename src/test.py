@@ -66,7 +66,7 @@ def get_data_iterator():
                                        batch_size=FLAGS.batch_size,
                                        boundaries=None, # No bucketing
                                        input_device=FLAGS.device,
-                                       filter_fn=filters.dyn_ctc_loss_filter)
+                                       filter_fn=filters.dyn_filter_by_width)
     return ds.make_one_shot_iterator()
 
 def _get_session_config():
