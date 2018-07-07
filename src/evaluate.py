@@ -209,7 +209,7 @@ def main(argv=None):
                          sess.run(update_metrics)
             except tf.errors.OutOfRangeError:
                 # Indicates that the single epoch is complete.
-                0 # NOP
+                pass
             finally:
                 coord.request_stop()
 
