@@ -18,92 +18,29 @@ import os
 import tensorflow as tf
 import numpy as np
 import pipeline
-# The list (well, string) of valid output characters
-# If any example contains a character not found here, an error will result
-# from the calls to .index in the decoder below
-out_charset=pipeline.out_charset
 
-def get_data(base_dir,file_patterns,
-             num_threads=4,
-             batch_size=32,
-             boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
-             input_device=None,
-             num_epoch=None,
-             filter_fn=None):
-    """Get input tensors bucketed by image width
-    Returns:
-      dataset : Dataset with elements structured as follows:
-                [image, width, label, length, text, filename]
-    """
-    
-    # Buffer size for TFRecord readers
-    capacity = num_threads*batch_size*2
+def get_dataset(args):
+    # Extract args
+    base_dir = args[0]
+    file_patterns = args[1]
+    num_threads = args[2]
+    capacity = args[3]
 
     # Get filenames into a dataset format
     filenames = tf.data.Dataset.from_tensor_slices(
         _get_filenames(base_dir, file_patterns))
-
-    with tf.device(input_device): # Create bucketing batcher
-        
-        dataset = tf.data.TFRecordDataset(filenames, 
-                                          num_parallel_reads=num_threads,
-                                          buffer_size=capacity)
-        dataset = dataset.prefetch(capacity)
-
-        # Preprocess
-        dataset = dataset.map(_parse_function, num_parallel_calls=num_threads)
-        dataset = dataset.prefetch(capacity)
-
-        # Filter out inappropriately dimension-ed elements
-        if filter_fn:
-            dataset = dataset.filter(filter_fn)
-
-        # Batch (and bucket if necessary)
-        if boundaries:
-            # Bucket according to image width
-            dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
-                element_length_func=_element_length_fn,
-                bucket_batch_sizes=np.full(len(boundaries) + 1, batch_size),
-                bucket_boundaries=boundaries))
-        else:
-            # Dynamically pad batches to match largest in batch
-            dataset = dataset.padded_batch(batch_size, 
-                                           padded_shapes=dataset.output_shapes)
-
-        # Repeat for num_epochs
-        if num_epoch:
-            dataset = dataset.repeat(num_epoch)
-
-        # Deserialize sparse tensor
-        dataset = dataset.map(
-            lambda image, width, label, length, text, filename: 
-            (image, 
-             width, 
-             tf.cast(tf.deserialize_many_sparse(label, tf.int64), 
-                     tf.int32),
-             length, 
-             text, 
-             filename),
-            num_parallel_calls=num_threads)
-
-    return dataset.prefetch(2*num_threads) # prefetch 2*num_threads*batch_size
-                
-def _element_length_fn(image, width, label, length, text, filename):
-    return width
-
-def _get_filenames(base_dir, file_patterns=['*.tfrecord']):
-    """Get a list of record files"""
+    dataset = tf.data.TFRecordDataset(filenames, 
+                                      num_parallel_reads=num_threads,
+                                      buffer_size=capacity)
+    return dataset.prefetch(capacity)
     
-    # List of lists ...
-    data_files = [tf.gfile.Glob(os.path.join(base_dir,file_pattern))
-                  for file_pattern in file_patterns]
-    # flatten
-    data_files = [data_file for sublist in data_files for data_file in sublist]
-
-    return data_files
+def postbatch_fn(image, width, label, length, text, filename):
+    label = tf.cast(tf.deserialize_many_sparse(label, tf.int64),
+                    tf.int32)
+    return image, width, label, length, text, filename
 
 # https://www.tensorflow.org/programmers_guide/datasets#consuming_tfrecord_data
-def _parse_function(data):
+def preprocess_fn(data):
     """Parse the elements of the dataset"""
 
     feature_map = {
@@ -134,6 +71,20 @@ def _parse_function(data):
     image = _preprocess_image(image)
 
     return image,width,label,length,text,filename
+
+def element_length_fn(image, width, label, length, text, filename):
+    return width
+
+def _get_filenames(base_dir, file_patterns=['*.tfrecord']):
+    """Get a list of record files"""
+    
+    # List of lists ...
+    data_files = [tf.gfile.Glob(os.path.join(base_dir,file_pattern))
+                  for file_pattern in file_patterns]
+    # flatten
+    data_files = [data_file for sublist in data_files for data_file in sublist]
+
+    return data_files
 
 def _preprocess_image(image):
     # Rescale from uint8([0,255]) to float([-0.5,0.5])

@@ -25,65 +25,9 @@ import pipeline
 # from the calls to .index in the decoder below
 out_charset=pipeline.out_charset
 
-def get_data(num_threads=4,
-             batch_size=32,
-             boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
-             input_device=None,
-             filter_fn=None):
-    """Get input dataset with elements bucketed by image width
-    Returns:
-      image  : float32 image tensor [batch_size 32 ? 1] padded 
-                 to max width in batch
-      width  : int32 image widths (for calculating post-CNN sequence length)
-      label  : Sparse tensor with label sequences for the batch
-      length : Length of label sequence (text length)
-      text   : Human readable string for the image
+def get_dataset(args=None):
     """
-    # Elements to be buffered
-    num_buffered_elements = num_threads*batch_size*2
-
-    dataset = _get_dataset().prefetch(num_buffered_elements)
-    
-    with tf.device(input_device):
-        dataset = dataset.map(_preprocess_dataset, 
-                              num_parallel_calls=num_threads)
-        dataset = dataset.prefetch(num_buffered_elements)
-
-        # Remove input that doesn't fit necessary specifications
-        if filter_fn:
-            dataset = dataset.filter(filter_fn)
-
-        # Bucket and batch appropriately
-        if boundaries:
-            dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
-                element_length_func=_element_length_fn,
-                bucket_batch_sizes=np.full(len(boundaries)+1, batch_size),
-                bucket_boundaries=boundaries,)) 
-        else:
-            # Dynamically pad batches to match largest in batch
-            dataset = dataset.padded_batch(batch_size, 
-                                           padded_shapes=dataset.output_shapes,)
-
-        # Convert labels to sparse tensor for CNN purposes
-        dataset = dataset.map(
-            lambda image, width, label, length, text:
-                (image, 
-                 width, 
-                 # -1 EOS token
-                 tf.contrib.layers.dense_to_sparse(label,-1),
-                 length, text),
-            num_parallel_calls=num_threads)
-        
-        # Prefetch some more
-        dataset = dataset.prefetch(8)
-    return dataset
-
-def _element_length_fn(image, width, label, length, text):
-    return width
-
-def _get_dataset():
-    """
-    Get a dataset from generator
+    Get a dataset from generator (args currently just for compatibility)
     Format: [text|image|labels] -- types and shapes can be seen below 
     """
     return tf.data.Dataset.from_generator(_generator_wrapper, 
@@ -92,7 +36,7 @@ def _get_dataset():
                (tf.TensorShape((32, None, 3))), # Shape 2nd element
                (tf.TensorShape([None]))))       # Shape 3rd element
 
-def _preprocess_dataset(caption, image, labels):
+def preprocess_fn(caption, image, labels):
     """Prepare dataset for ingestion"""
 
     #NOTE: final image should be pre-grayed by opencv *before* generation
@@ -103,11 +47,19 @@ def _preprocess_dataset(caption, image, labels):
     width = tf.size(image[1]) 
 
     # Length is the length of labels - 1 (because labels has -1 EOS token here)
-    length = tf.subtract(tf.size(labels) - 1) 
+    length = tf.subtract(tf.size(labels), -1) 
 
     text = caption
 
     return image, width, labels, length, text
+
+def postbatch_fn(image, width, label, length, text):
+    # Convert dense to sparse with EOS token of -1
+    label = tf.contrib.layers.dense_to_sparse(label, -1)
+    return image, width, label, length, text
+
+def element_length_fn(image, width, label, length, text):
+    return width
 
 def _generator_wrapper():
     """
