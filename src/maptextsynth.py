@@ -19,17 +19,11 @@ import tensorflow as tf
 import numpy as np
 from map_generator import data_generator
 import pipeline
+
 # The list (well, string) of valid output characters
 # If any example contains a character not found here, an error will result
 # from the calls to .index in the decoder below
 out_charset=pipeline.out_charset
-
-# Get a sparse tensor for table lookup in the tensorflow runtime
-out_charset_tf=tf.string_split([tf.constant(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")], "")
-
-def num_classes():
-    return len(out_charset)
 
 def get_data(num_threads=4,
              batch_size=32,
@@ -64,17 +58,18 @@ def get_data(num_threads=4,
             dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
                 element_length_func=_element_length_fn,
                 bucket_batch_sizes=np.full(len(boundaries)+1, batch_size),
-                bucket_boundaries=boundaries))
+                bucket_boundaries=boundaries,)) 
         else:
             # Dynamically pad batches to match largest in batch
             dataset = dataset.padded_batch(batch_size, 
-                                           padded_shapes=dataset.output_shapes)
+                                           padded_shapes=dataset.output_shapes,)
 
         # Convert labels to sparse tensor for CNN purposes
         dataset = dataset.map(
             lambda image, width, label, length, text:
                 (image, 
                  width, 
+                 # -1 EOS token
                  tf.contrib.layers.dense_to_sparse(label,-1),
                  length, text),
             num_parallel_calls=num_threads)
@@ -97,19 +92,6 @@ def _get_dataset():
                (tf.TensorShape((32, None, 3))), # Shape 2nd element
                (tf.TensorShape([None]))))       # Shape 3rd element
 
-# Note: Currently not in use: probably more optimal than current implementation
-def _text_to_labels(text):
-    """Convert given text (tf.string) into a list of tf.int32's"""
-    labels = tf.data.Dataset.from_tensor_slices(tf.string_split([text],""))
-    
-    # Converts ['A', 'B', 'C'] -> [0, 1, 2]
-    # Note: MUST RUN tf.tables_initializer().run() in order for this to work
-    table = tf.contrib.lookup.index_table_from_tensor(mapping=out_charset_tf,
-                num_oov_buckets=1,
-                default_value=0)
-    labels = table.lookup(labels)
-    return labels
-
 def _preprocess_dataset(caption, image, labels):
     """Prepare dataset for ingestion"""
 
@@ -119,10 +101,12 @@ def _preprocess_dataset(caption, image, labels):
 
     # Width is the 2nd element of the image tuple
     width = tf.size(image[1]) 
-    # labels = _text_to_labels(caption) Not necessary with precomputed labels
-    # labels = tf.contrib.layers.dense_to_sparse(labels,0) if possible
-    length = tf.size(labels)
+
+    # Length is the length of labels - 1 (because labels has -1 EOS token here)
+    length = tf.subtract(tf.size(labels) - 1) 
+
     text = caption
+
     return image, width, labels, length, text
 
 def _generator_wrapper():
@@ -138,6 +122,7 @@ def _generator_wrapper():
 
         # Transform string text to sequence of indices using charset
         labels = [out_charset.index(c) for c in list(caption)]
+        labels.append(-1)
         yield caption, image, labels
 
 def _preprocess_image(image):
