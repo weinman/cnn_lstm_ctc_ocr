@@ -48,7 +48,7 @@ tf.app.flags.DEFINE_integer('length_threshold',None,
 tf.app.flags.DEFINE_string('model','../data/model',
                           """Directory for model checkpoints""")
 
-tf.app.flags.DEFINE_integer('testing_batch_size',2**8,
+tf.app.flags.DEFINE_integer('testing_batch_size',2**9,
                             """Eval batch size""")
 tf.app.flags.DEFINE_integer('test_interval_secs', 60,
                              'Time between test runs')

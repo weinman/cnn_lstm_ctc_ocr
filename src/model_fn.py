@@ -101,7 +101,7 @@ def model_fn (features, labels, mode):
                                           train_op=train_op)
 
     #Testing the model
-    elif mode == tf.estimator.ModeKeys.PREDICT:
+    elif mode == tf.estimator.ModeKeys.EVAL:
         with tf.device(FLAGS.device):
             label = features['label']
             length = features['length']
@@ -109,20 +109,22 @@ def model_fn (features, labels, mode):
             loss,label_error,sequence_error = _get_testing(
                 logits,sequence_length,label,length)
 
-            #Create homogeneity among the return values
-            global_step = tf.convert_to_tensor(
-                tf.train.get_or_create_global_step())
-            global_step = tf.cast(global_step, tf.float32)
-            sequence_error = tf.cast(sequence_error, tf.float32)
+            return tf.estimator.EstimatorSpec(mode=mode, 
+                                              loss=loss, 
+                                              eval_metric_ops=
+                                              {'label_error':
+                                               metric_fn(label_error),
+                                               'sequence_error':
+                                               seq_err_metric_fn(sequence_error)},
+                                              train_op=None)
 
-            #Get the correct format to pass to estimator spec
-            result = tf.convert_to_tensor([(tf.stack([global_step,
-                                                  loss, 
-                                                  label_error, 
-                                                  sequence_error], axis=0))])
+def label_err_metric_fn(label_error):
+    metric, update_op = tf.metrics.mean(label_error)
 
-            return tf.estimator.EstimatorSpec(mode=mode, loss=loss, 
-                                      predictions=result, 
-                                      train_op=None)
+    return metric, update_op
 
+def seq_err_metric_fn(sequence_error):
+    metric, update_op = tf.metrics.mean(sequence_error)
+
+    return metric, update_op
 

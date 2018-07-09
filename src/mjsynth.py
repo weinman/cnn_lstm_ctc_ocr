@@ -127,9 +127,9 @@ def threaded_input_pipeline(base_dir,file_patterns,
                                                                   tf.int64),
                                        tf.int32),
                                length, text, filename))
-
+        dataset.shuffle(2*num_threads*batch_size)
         # Repeat for num_epochs
-        dataset = dataset.repeat(num_epochs)
+        #dataset = dataset.repeat(num_epochs)
 
     return dataset
 

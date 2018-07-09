@@ -18,7 +18,6 @@ import time
 import tensorflow as tf
 from tensorflow.contrib import learn
 import cv2
-#import dynmj
 import mjsynth
 import model
 import model_fn
@@ -43,8 +42,12 @@ def _get_input_stream():
     image, width, label, length, _, _ = iterator.get_next()
 
     # The input for the model function 
-    features = {"image": image, "width": width, "length": length, "label": label, 
+    features = {"image": image, 
+                "width": width, 
+                "length": length, 
+                "label": label, 
                 "optimizer": optimizer}
+
     return features, label
 
 def _get_session_config():
@@ -59,19 +62,15 @@ def _get_session_config():
 def main(argv=None):
 
     custom_config = tf.estimator.RunConfig(session_config=_get_session_config())
-    
-   
 
     # Initialize the classifier
     classifier = tf.estimator.Estimator(model_fn=model_fn.model_fn, 
                                         model_dir=FLAGS.model,
                                         config=custom_config)
-
-    predictions = classifier.predict(input_fn=lambda: _get_input_stream())
-
-    # Iterate through the generator object
-    for items in predictions:
-        print(items)
+    
+    while True:
+        evaluations = classifier.evaluate(input_fn=lambda: _get_input_stream())
+        print(evaluations)
 
 if __name__ == '__main__':
     tf.app.run()

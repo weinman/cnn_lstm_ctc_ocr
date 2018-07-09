@@ -68,9 +68,12 @@ def _get_single_input_stream():
 def _get_session_config():
     """Setup session config to soften device placement"""
 
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+
     config=tf.ConfigProto(
         allow_soft_placement=True, 
-        log_device_placement=False)
+        log_device_placement=False,
+        gpu_options=gpu_options)
 
     return config
 
