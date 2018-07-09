@@ -3,6 +3,9 @@ import tensorflow as tf
 out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 _num_classes = len(out_charset)
 
+def num_classes():
+    return len(out_charset)
+
 def get_static_data(base_dir,
                     file_patterns,
                     num_threads=4,

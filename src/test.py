@@ -13,7 +13,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import os
 import time
 import tensorflow as tf
@@ -22,52 +21,44 @@ from tensorflow.contrib import learn
 import pipeline
 import model
 import filters
+import model_fn
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('model','../data/model',
-                          """Directory for model checkpoints""")
-tf.app.flags.DEFINE_string('output','test',
-                          """Sub-directory of model for test summary events""")
-
-tf.app.flags.DEFINE_integer('batch_size',2**8,
-                            """Eval batch size""")
-tf.app.flags.DEFINE_integer('test_interval_secs', 60,
-                             'Time between test runs')
-
-tf.app.flags.DEFINE_string('device','/gpu:0',
-                           """Device for graph placement""")
-tf.app.flags.DEFINE_boolean('static_data', True,
-                            """Whether to use static data (false for dynamic data)""")
-tf.app.flags.DEFINE_string('test_path','../data/',
-                           """Base directory for test/validation data""")
-tf.app.flags.DEFINE_string('filename_pattern','val/words-*',
-                           """File pattern for input data""")
-tf.app.flags.DEFINE_integer('num_input_threads',4,
-                          """Number of readers for input data""")
-
+optimizer = 'Adam'
 tf.logging.set_verbosity(tf.logging.WARN)
 
-# Non-configurable parameters
-mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
 
-def get_data_iterator():
+def _get_input_stream():
     if(FLAGS.static_data):
         ds = pipeline.get_static_data(FLAGS.test_path, 
-                                      str.split(FLAGS.filename_pattern,','),
-                                      num_threads=FLAGS.num_input_threads,
+                                      str.split(
+                                          FLAGS.filename_pattern_test,','),
+                                      num_threads=FLAGS.num_input_threads_eval,
                                       boundaries=None, # No bucketing
-                                      batch_size=FLAGS.batch_size,
+                                      batch_size=FLAGS.batch_size_eval,
                                       input_device=FLAGS.device,
                                       filter_fn=None)
                                     
     else:
-        ds = pipeline.get_dynamic_data(num_threads=FLAGS.num_input_threads,
-                                       batch_size=FLAGS.batch_size,
+        ds = pipeline.get_dynamic_data(num_threads=FLAGS.num_input_threads_eval,
+                                       batch_size=FLAGS.batch_size_eval,
                                        boundaries=None, # No bucketing
                                        input_device=FLAGS.device,
                                        filter_fn=filters.dyn_filter_by_width)
-    return ds.make_one_shot_iterator()
+
+    iterator = ds.make_one_shot_iterator() 
+    
+    image, width, label, length, _, _ = iterator.get_next()
+
+    # The input for the model function 
+    features = {"image": image, 
+                "width": width, 
+                "length": length, 
+                "label": label, 
+                "optimizer": optimizer}
+
+    return features, label
 
 def _get_session_config():
     """Setup session config to soften device placement"""
@@ -77,105 +68,18 @@ def _get_session_config():
 
     return config
 
-def _get_testing(rnn_logits,sequence_length,label,label_length):
-    """Create ops for testing (all scalars): 
-       loss: CTC loss function value, 
-       label_error:  Batch-normalized edit distance on beam search max
-       sequence_error: Batch-normalized sequence error rate
-    """
-    with tf.name_scope("train"):
-        loss = model.ctc_loss_layer(rnn_logits,label,sequence_length) 
-    with tf.name_scope("test"):
-        predictions,_ = tf.nn.ctc_beam_search_decoder(rnn_logits, 
-                                                   sequence_length,
-                                                   beam_width=128,
-                                                   top_paths=1,
-                                                   merge_repeated=True)
-        hypothesis = tf.cast(predictions[0], tf.int32) # for edit_distance
-        label_errors = tf.edit_distance(hypothesis, label, normalize=False)
-        sequence_errors = tf.count_nonzero(label_errors,axis=0)
-        total_label_error = tf.reduce_sum( label_errors )
-        total_labels = tf.reduce_sum( label_length )
-        label_error = tf.truediv( total_label_error, 
-                                  tf.cast(total_labels, tf.float32 ),
-                                  name='label_error')
-        sequence_error = tf.truediv( tf.cast( sequence_errors, tf.int32 ),
-                                     tf.shape(label_length)[0],
-                                     name='sequence_error')
-        tf.summary.scalar( 'loss', loss )
-        tf.summary.scalar( 'label_error', label_error )
-        tf.summary.scalar( 'sequence_error', sequence_error )
-
-    return loss, label_error, sequence_error
-
-def _get_checkpoint():
-    """Get the checkpoint path from the given model output directory"""
-    ckpt = tf.train.get_checkpoint_state(FLAGS.model)
-
-    if ckpt and ckpt.model_checkpoint_path:
-        ckpt_path=ckpt.model_checkpoint_path
-    else:
-        raise RuntimeError('No checkpoint file found')
-
-    return ckpt_path
-
-def _get_init_trained():
-    """Return init function to restore trained model from a given checkpoint"""
-    saver_reader = tf.train.Saver(
-        tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-    )
-    
-    init_fn = lambda sess,ckpt_path: saver_reader.restore(sess, ckpt_path)
-    return init_fn
 
 def main(argv=None):
+    custom_config = tf.estimator.RunConfig(session_config=_get_session_config())
 
-    with tf.Graph().as_default():
-        input_stream = get_data_iterator()
-        global_step = tf.train.get_or_create_global_step()
-        
-        if(FLAGS.static_data):
-            image,width,label,length,_,_ = input_stream.get_next()
-        else:
-            image,width,label,length,_ = input_stream.get_next()
-
-        with tf.device(FLAGS.device):
-            features,sequence_length = model.convnet_layers(image, width, mode)
-            logits = model.rnn_layers(features, sequence_length,
-                                       pipeline.num_classes())
-            loss,label_error,sequence_error = _get_testing(
-                logits,sequence_length,label,length)
-
-        session_config = _get_session_config()
-        restore_model = _get_init_trained()
-
-        summary_op = tf.summary.merge_all()
-        init_op = tf.group( tf.global_variables_initializer(),
-                            tf.local_variables_initializer()) 
-
-        summary_writer = tf.summary.FileWriter( os.path.join(FLAGS.model,
-                                                            FLAGS.output) )
-
-        step_ops = [global_step, loss, label_error, sequence_error]
-
-        with tf.Session(config=session_config) as sess:
-            
-            sess.run(init_op)
-            summary_writer.add_graph(sess.graph)
-
-            try:            
-                while True:
-                    # Get latest checkpoint
-                    restore_model(sess, _get_checkpoint()) 
-                    
-                    step_vals = sess.run(step_ops)
-                    print step_vals
-                    
-                    summary_str = sess.run(summary_op)
-                    summary_writer.add_summary(summary_str,step_vals[0])
-
-            except tf.errors.OutOfRangeError:
-                print('Done')
+    # Initialize the classifier
+    classifier = tf.estimator.Estimator(model_fn=model_fn.model_fn, 
+                                        model_dir=FLAGS.model,
+                                        config=custom_config)
+    
+    while True:
+        evaluations = classifier.evaluate(input_fn=lambda: _get_input_stream())
+        print(evaluations)
 
 if __name__ == '__main__':
     tf.app.run()
