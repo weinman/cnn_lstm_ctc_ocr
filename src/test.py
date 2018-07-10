@@ -28,15 +28,26 @@ FLAGS = tf.app.flags.FLAGS
 tf.logging.set_verbosity(tf.logging.WARN)
 
 def _input_fn():
+    """Get dataset according to tf flags for Estimator ingestion
+    Returns:
+      dataset : elements structured as [features, labels]
+                feature structure can be seen in postbatch_fn 
+                in mjsynth/maptextsynth
+    """
+
+    # We only want a filter_fn if we have dynamic data (for now)
+    filter_fn = None if FLAGS.static_data else filters.dyn_filter_by_width
+
     # Get data according to flags
     dataset = pipeline.get_data(FLAGS.static_data,
-                           base_dir=FLAGS.eval_path,
-                           file_patterns=str.split(FLAGS.filename_pattern_eval,
-                                                   ','),
-                           num_threads=FLAGS.num_input_threads_eval,
-                           batch_size=FLAGS.batch_size_eval,
-                           input_device=FLAGS.input_device,
-                           filter_fn=None)
+                                base_dir=FLAGS.eval_path,
+                                file_patterns=str.split(
+                                    FLAGS.filename_pattern_eval,
+                                    ','),
+                                num_threads=FLAGS.num_input_threads_eval,
+                                batch_size=FLAGS.batch_size_eval,
+                                input_device=FLAGS.input_device,
+                                filter_fn=filter_fn)
     return dataset
 
 def _get_session_config():

@@ -1,73 +1,49 @@
+import tensorflow as tf
+import numpy as np
+
 # The list (well, string) of valid output characters
 # If any example contains a character not found here, 
 # you'll get a runtime error when this is encountered.
 out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
+""" 
+Dict for constant time string->label conversion
+Attribution: https://stackoverflow.com/questions/36459969/python-convert-list-to-dictionary-with-indexes -- from user: Abhijit
+Produces a table of character->index mappings according to out_charset
+"""
+out_charset_dict = {key: val for val, key in enumerate(out_charset)}
+
 def num_classes():
+    """ Returns length/size of out_charset """
     return len(out_charset)
 
-# Efficiency!
-# Yeah, I know
-out_charset_dict = {'A' : 0, 
-                    'B' : 1, 
-                    'C' : 2, 
-                    'D' : 3,
-                    'E' : 4,
-                    'F' : 5,
-                    'G' : 6,
-                    'H' : 7,
-                    'I' : 8,
-                    'J' : 9,
-                    'K' : 10,
-                    'L' : 11,
-                    'M' : 12,
-                    'N' : 13,
-                    'O' : 14,
-                    'P' : 15,
-                    'Q' : 16,
-                    'R' : 17,
-                    'S' : 18,
-                    'T' : 19,
-                    'U' : 20,
-                    'V' : 21,
-                    'W' : 22,
-                    'X' : 23,
-                    'Y' : 24,
-                    'Z' : 25,
-                    'a' : 26, 
-                    'b' : 27, 
-                    'c' : 28, 
-                    'd' : 29,
-                    'e' : 30,
-                    'f' : 31,
-                    'g' : 32,
-                    'h' : 33,
-                    'i' : 34,
-                    'j' : 35,
-                    'k' : 36,
-                    'l' : 37,
-                    'm' : 38,
-                    'n' : 39,
-                    'o' : 40,
-                    'p' : 41,
-                    'q' : 42,
-                    'r' : 43,
-                    's' : 44,
-                    't' : 45,
-                    'u' : 46,
-                    'v' : 47,
-                    'w' : 48,
-                    'x' : 49,
-                    'y' : 50,
-                    'z' : 51,
-                    '0' : 52,
-                    '1' : 53,
-                    '2' : 54,
-                    '3' : 55,
-                    '4' : 56, 
-                    '5' : 57,
-                    '6' : 58,
-                    '7' : 59,
-                    '8' : 60,
-                    '9' : 61, 
-}
+# get_string and get_strings courtesy of Jerod Weinman. See:
+# https://github.com/weinman/cnn_lstm_ctc_ocr/blob/f98902564ed9883f00267557ac8e386771fab7aa/src/mjsynth.py#L29
+# get_string tweaked to use dict rather than index member func
+def get_strings(labels):
+    """
+    Transform a SparseTensorValue matrix of labels into the corresponding
+    list of character strings
+    """
+    num_strings = labels.dense_shape[0]
+    
+    strings = []
+
+    for row in range(num_strings):
+
+        indices = np.where( labels.indices[:,0]==row )[0]
+        indices.shape = (indices.shape[0], 1)
+
+        label = labels.values[indices]
+        label.shape = (label.shape[0],)
+
+        strings.append( get_string( label ))
+
+    return strings
+
+def get_string(labels):
+    """Transform an 1D array of labels into the corresponding character string"""
+    string = ''.join([out_charset_dict[c] for c in labels])
+    return string
+
+

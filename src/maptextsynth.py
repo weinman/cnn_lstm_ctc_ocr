@@ -33,8 +33,26 @@ def get_dataset(args=None):
                (tf.TensorShape([None]))))       # Labels shape
 
 def preprocess_fn(caption, image, labels):
-    """Prepare dataset for ingestion"""
-
+    """
+    Reformat raw data for model trainer. 
+    Intended to get data as formatted from get_dataset function.
+    Parameters:
+      caption : tf.string corresponding to text
+      image   : tf.int32 tensor of shape [32, ?, 3]
+      labels  : tf.int32 tensor of shape [?]
+    Returns:
+      image   : preprocessed image
+                  tf.float32 tensor of shape [32, ?, 1] (? = width)
+      width   : width (in pixels) of image
+                  tf.int32 tensor of shape []
+      labels  : list of indices of characters mapping text->out_charset
+                  tf.int32 tensor of shape [?] (? = length+1)
+      length  : length of labels (sans -1 EOS token)
+                  tf.int32 tensor of shape []
+      text    : ground truth string
+                  tf.string tensor of shape []
+    
+    """
     image = _preprocess_image(image)
 
     # Width is the 2nd element of the image tuple
@@ -49,6 +67,11 @@ def preprocess_fn(caption, image, labels):
     return image, width, labels, length, text
 
 def postbatch_fn(image, width, label, length, text):
+    """ 
+    Prepare dataset for ingestion by Estimator.
+    Sparsifies labels, and squanches the rest of the components into feature map
+    """
+
     # Convert dense to sparse with EOS token of -1
     # Labels must be sparse for ctc_loss
     label = tf.contrib.layers.dense_to_sparse(label, -1)
@@ -64,11 +87,21 @@ def postbatch_fn(image, width, label, length, text):
     return features, label
 
 def element_length_fn(image, width, label, length, text):
+    """ 
+    Determine element length
+    Note: mjsynth version of this function has extra parameter (filename)
+    """
     return width
 
 def _generator_wrapper():
     """
-    Compute the labels in python before everything becomes tensors
+    Wraps data_generator to precompute labels in python before everything
+    becomes tensors. 
+    Returns:
+      caption : ground truth string
+      image   : raw mat object image [32, ?, 3] 
+      label   : list of indices corresponding to out_charset 
+                length=len(caption)
     """
     gen = data_generator()
     while True:
@@ -77,14 +110,15 @@ def _generator_wrapper():
         image = data[1]
 
         # Transform string text to sequence of indices using charset dict
-        labels = [charset.out_charset_dict[c] for c in list(caption)]
+        label = [charset.out_charset_dict[c] for c in list(caption)]
         
         # Add in -1 as an EOS token for sparsification in postbatch_fn
-        labels.append(-1)
+        label.append(-1)
 
-        yield caption, image, labels
+        yield caption, image, label
 
 def _preprocess_image(image):
+    """Convert image to grayscale and rescale"""
     # Final image should be pre-grayed in opencv *before* generation
     image = tf.image.rgb_to_grayscale(image) 
     

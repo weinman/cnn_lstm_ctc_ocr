@@ -10,7 +10,22 @@ def get_data(static_data,
              input_device=None,
              num_epochs=None,
              filter_fn=None):
-    
+    """Get dataset according to parameters
+    Parameters:
+      static_data   : boolean for whether to use static or dynamic data
+      base_dir      : string for static data locations (static data only)
+      file_patterns : string for static data patterns  (static data only)
+      num_threads   : number of threads to use for IO / preprocessing
+      batch_size    : see name
+      boundaries    : boundaries for bucketing. If None, no bucketing
+      input_device  : Device for pinning ops
+      num_epochs    : if None, data repeats infinitely (static data only)
+      filter_fn     : filtering function
+    Returns:
+      dataset : elements structured as [features, labels]
+                feature structure can be seen in postbatch_fn 
+                in mjsynth/maptextsynth.py
+    """    
     # Elements to be buffered
     num_buffered_elements = num_threads*batch_size*2
 
@@ -72,7 +87,7 @@ def get_data(static_data,
     return dataset
 
 def rescale_image(image):
-    # Rescale from uint8([0,255]) to float([-0.5,0.5])
+    """Rescale from uint8([0,255]) to float([-0.5,0.5])"""
     image = tf.image.convert_image_dtype(image, tf.float32)
     image = tf.subtract(image, 0.5)
     return image
