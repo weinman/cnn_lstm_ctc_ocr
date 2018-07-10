@@ -63,13 +63,23 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
                                                    top_paths=1,
                                                    merge_repeated=True)
         hypothesis = tf.cast(predictions[0], tf.int32) # for edit_distance
-        label_errors = tf.edit_distance(hypothesis, label, normalize=False)
-        sequence_errors = tf.count_nonzero(label_errors,axis=0)
-        total_label_error = tf.reduce_sum( label_errors )
-        total_labels = tf.reduce_sum( label_length )
 
-        total_labels = tf.cast(total_labels, tf.float32 )
-        total_label_error = tf.cast( total_label_error, tf.float32 )
+        # Per-sequence statistic
+        num_label_errors = tf.edit_distance(hypothesis, label, normalize=False)
+        # Per-batch summary counts
+        batch_num_label_errors = tf.reduce_sum( num_label_errors )
+        batch_num_sequence_errors = tf.count_nonzero(num_label_errors,axis=0)
+        batch_num_labels = tf.reduce_sum( label_length )
+        
+        batch_num_label_errors = tf.cast( batch_num_label_errors, tf.int64 )
+        batch_num_sequence_errors = tf.cast(batch_num_sequence_errors, tf.int64)
+        batch_num_labels = tf.cast( batch_num_labels, tf.int64 )
+
+        #total_label_error = tf.reduce_sum( label_errors )
+        #total_labels = tf.reduce_sum( label_length )
+
+        #total_labels = tf.cast(total_labels, tf.int64 )
+        #total_label_error = tf.cast( total_label_error, tf.float32 )
         #label_error = tf.truediv( total_label_error, 
         #                          tf.cast(total_labels, tf.float32 ),
         #                          name='label_error')
@@ -79,7 +89,7 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
         #tf.summary.scalar( 'loss', loss )
         #tf.summary.scalar( 'label_error', label_error )
         #tf.summary.scalar( 'sequence_error', sequence_error )
-    return loss, total_label_error, sequence_errors, total_labels
+    return loss, batch_num_label_errors, batch_num_sequence_errors,batch_num_labels
 
 
 def model_fn (features, labels, mode):
@@ -120,39 +130,46 @@ def model_fn (features, labels, mode):
                                               loss=loss, 
                                               eval_metric_ops=
                                               {'label_error':
-                                               label_err_metric_fn(label_error, total_labels)},
+                                               label_err_metric_fn(label_error, total_labels),
                                                'sequence_error':
                                                seq_err_metric_fn(sequence_error, length)},
                                               train_op=None)
 
 def label_err_metric_fn(batch_num_label_error, batch_total_labels):
+    print('here')
     var_collections=[tf.GraphKeys.LOCAL_VARIABLES]
+
+    # Variables to tally across batches (all initially zero)
     total_num_label_errors = tf.Variable(0, trainable=False,
                                              name='total_num_label_errors',
-                                             dtype=tf.float32,
+                                             dtype=tf.int64,
                                          collections=var_collections)
 
     total_num_labels =  tf.Variable(0, trainable=False,
                                         name='total_num_labels',
-                                        dtype=tf.float32,
+                                        dtype=tf.int64,
                                     collections=var_collections)
 
+    # Create the "+=" update ops and group together as one
     update_label_errors    = tf.assign_add( total_num_label_errors,
                                             batch_num_label_error)
     update_num_labels     = tf.assign_add( total_num_labels,
                                             batch_total_labels )
 
     update_op = tf.group(update_label_errors,update_num_labels )
-                                              
+
+    # Get the average label error across all inputs
     label_error = tf.truediv( total_num_label_errors, 
                                   total_num_labels,
                               name='label_error')    
    
-    return total_num_label_errors, update_op
+    return label_error, update_op
 
-def seq_err_metric_fn(sequence_error, label_length):
+def seq_err_metric_fn(batch_num_sequence_errors, label_length):
+
     var_collections=[tf.GraphKeys.LOCAL_VARIABLES]
 
+    # Variables to tally across batches (all initially zero)
     total_num_sequence_errors =  tf.Variable(0, trainable=False,
                                     name='total_num_sequence_errors',
                                     dtype=tf.int64,
@@ -163,13 +180,18 @@ def seq_err_metric_fn(sequence_error, label_length):
                                        dtype=tf.int64,
                                        collections=var_collections)
 
+    batch_size = tf.shape(label_length)[0]
+    batch_size = tf.cast(batch_size, tf.int64)
+
+    # Create the "+=" update ops and group together as one
     update_sequence_errors = tf.assign_add( total_num_sequence_errors,
                                             batch_num_sequence_errors )
     update_num_sequences   = tf.assign_add( total_num_sequences,
-                                            batch_size )
+                                            batch_size)
 
-    update_op = tf.group(update_sequence_errors,update_num_sequences)
+    update_op = tf.group(update_sequence_errors, update_num_sequences)
 
+    # Get the average sequence error across all inputs
     sequence_error = tf.truediv( total_num_sequence_errors,
                                  total_num_sequences,
                                  name='sequence_error')
