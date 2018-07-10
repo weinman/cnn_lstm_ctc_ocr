@@ -6,7 +6,7 @@ import pipeline
 
 FLAGS = tf.app.flags.FLAGS
 optimizer = 'Adam'
-
+tf.logging.set_verbosity(tf.logging.INFO)
 def _get_training(rnn_logits,label,sequence_length):
     """Set up training ops"""
     with tf.name_scope("train"):
@@ -68,29 +68,17 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
         # Per-sequence statistic
         num_label_errors = tf.edit_distance(hypothesis, label, normalize=False)
         # Per-batch summary counts
-        batch_num_label_errors = tf.reduce_sum( num_label_errors )
+        batch_num_label_errors = tf.reduce_sum( num_label_errors, name='damn')
         batch_num_sequence_errors = tf.count_nonzero(num_label_errors,axis=0)
         batch_num_labels = tf.reduce_sum( label_length )
         
+        # Wide integer type casts (prefer unsigned, but truediv dislikes those)
         batch_num_label_errors = tf.cast( batch_num_label_errors, tf.int64 )
         batch_num_sequence_errors = tf.cast(batch_num_sequence_errors, tf.int64)
-        batch_num_labels = tf.cast( batch_num_labels, tf.int64 )
-
-        #total_label_error = tf.reduce_sum( label_errors )
-        #total_labels = tf.reduce_sum( label_length )
-
-        #total_labels = tf.cast(total_labels, tf.int64 )
-        #total_label_error = tf.cast( total_label_error, tf.float32 )
-        #label_error = tf.truediv( total_label_error, 
-        #                          tf.cast(total_labels, tf.float32 ),
-        #                          name='label_error')
-        #sequence_error = tf.truediv( tf.cast( sequence_errors, tf.int32 ),
-        #                             tf.shape(label_length)[0],
-        #                             name='sequence_error')
-        #tf.summary.scalar( 'loss', loss )
-        #tf.summary.scalar( 'label_error', label_error )
-        #tf.summary.scalar( 'sequence_error', sequence_error )
-    return loss, batch_num_label_errors, batch_num_sequence_errors, batch_num_labels
+        batch_num_labels = tf.cast( batch_num_labels, tf.int64)
+        tf.identity(batch_num_label_errors, name='lab')
+        
+    return loss, batch_num_label_errors, batch_num_sequence_errors, batch_num_labels, predictions
 
 
 def model_fn (features, labels, mode):
@@ -118,25 +106,33 @@ def model_fn (features, labels, mode):
     #Testing the model
     elif mode == tf.estimator.ModeKeys.EVAL:
 
-        #var_collections=[tf.GraphKeys.GLOBAL_VARIABLES]
-
         with tf.device(FLAGS.device):
             label = features['label']
             length = features['length']
 
-            loss,label_error,sequence_error, total_labels = _get_testing(
-                logits,sequence_length,label,length)
+            loss,label_error,sequence_error, total_labels, predictions = _get_testing(logits,sequence_length,label,length)
+
+            mean_label_error, update_op_label, total_num_label_errors, total_num_labels= label_err_metric_fn(label_error, total_labels)
+
+            mean_sequence_error, update_op_seq, total_num_sequence_errors,total_num_sequences= seq_err_metric_fn(sequence_error, length)
+
+            #metrics = [total_num_label_errors, total_num_labels,total_num_sequence_errors,total_num_sequences]
+            metrics = tf.convert_to_tensor(tf.stack([total_num_label_errors,
+                                                     total_num_labels,
+                                                     total_num_sequence_errors,
+                                                     total_num_sequences], axis=0))
 
             return tf.estimator.EstimatorSpec(mode=mode, 
                                               loss=loss, 
                                               eval_metric_ops=
                                               {'label_error':
-                                               label_err_metric_fn
-                                               (label_error, total_labels),
+                                               (mean_label_error, 
+                                                update_op_label),
                                                'sequence_error':
-                                               seq_err_metric_fn
-                                               (sequence_error, length)},
-                                              train_op=None)
+                                               (mean_sequence_error,
+                                                update_op_seq),
+                                               'misc_metrics': (metrics, metrics)})
+
 
 def label_err_metric_fn(batch_num_label_error, batch_total_labels):
     
@@ -161,12 +157,13 @@ def label_err_metric_fn(batch_num_label_error, batch_total_labels):
 
     update_op = tf.group(update_label_errors,update_num_labels )
 
+    
     # Get the average label error across all inputs
     label_error = tf.truediv( total_num_label_errors, 
                                   total_num_labels,
                               name='label_error')    
    
-    return label_error, update_op
+    return label_error, update_op, total_num_label_errors, total_num_labels
 
 def seq_err_metric_fn(batch_num_sequence_errors, label_length):
 
@@ -199,5 +196,5 @@ def seq_err_metric_fn(batch_num_sequence_errors, label_length):
                                  total_num_sequences,
                                  name='sequence_error')
     
-    return sequence_error, update_op
+    return sequence_error, update_op, total_num_sequence_errors,total_num_sequences
 

@@ -27,6 +27,21 @@ FLAGS = tf.app.flags.FLAGS
 
 optimizer = 'Adam'
 tf.logging.set_verbosity(tf.logging.WARN)
+tf.logging.set_verbosity(tf.logging.INFO)
+
+class LoggerHook(tf.train.SessionRunHook):
+    """Logs metrics after each batch"""
+
+    def begin(self):
+        self._step = -1
+
+    def before_run(self, run_context):
+        self._step += 1
+        return tf.train.SessionRunArgs(loss)
+
+    def after_run(self, run_context, run_values):
+        loss = run_values.results
+        print(loss)
 
 
 def _get_input_stream():
@@ -76,10 +91,9 @@ def main(argv=None):
     classifier = tf.estimator.Estimator(model_fn=model_fn.model_fn, 
                                         model_dir=FLAGS.model,
                                         config=custom_config)
-    
-    while True:
-        evaluations = classifier.evaluate(input_fn=lambda: _get_input_stream())
-        print(evaluations)
+
+    evaluations = classifier.evaluate(input_fn=lambda: _get_input_stream())
+    print(evaluations)
 
 if __name__ == '__main__':
     tf.app.run()
