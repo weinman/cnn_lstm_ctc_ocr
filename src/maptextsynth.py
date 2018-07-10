@@ -55,12 +55,13 @@ def preprocess_fn(caption, image, labels):
 
 def postbatch_fn(image, width, label, length, text):
     # Convert dense to sparse with EOS token of -1
+    # Labels must be sparse for ctc_loss
     label = tf.contrib.layers.dense_to_sparse(label, -1)
     
-    # Format relevant features
+    # Format relevant features for estimator ingestion
     features = {
         "image" : image, 
-        "width" : width, 
+        "width" : width,
         "length": length,
         "text"  : text
     }
@@ -73,7 +74,6 @@ def element_length_fn(image, width, label, length, text):
 def _generator_wrapper():
     """
     Compute the labels in python before everything becomes tensors
-    Note: Really should not be doing this in python if we don't have to!!!
     """
     gen = data_generator()
     while True:
@@ -83,7 +83,10 @@ def _generator_wrapper():
 
         # Transform string text to sequence of indices using charset
         labels = [out_charset.index(c) for c in list(caption)]
+        
+        # Add in -1 as an EOS token for sparsification in postbatch_fn
         labels.append(-1)
+
         yield caption, image, labels
 
 def _preprocess_image(image):

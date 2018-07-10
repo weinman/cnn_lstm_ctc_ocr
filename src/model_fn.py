@@ -104,7 +104,7 @@ def model_fn (features, labels, mode):
     #Testing the model
     elif mode == tf.estimator.ModeKeys.EVAL:
         with tf.device(FLAGS.device):
-            label = features['label']
+            label = labels# features['label']
             length = features['length']
 
             loss,label_error,sequence_error = _get_testing(

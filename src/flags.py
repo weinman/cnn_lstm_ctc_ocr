@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-#Flags used in training
+# Flags used in training
 tf.app.flags.DEFINE_string('train_output','../data/model',
                            """Directory for event logs and checkpoints""")
 tf.app.flags.DEFINE_string('tune_from','',
@@ -21,7 +21,26 @@ tf.app.flags.DEFINE_float('decay_steps',2**16,
 tf.app.flags.DEFINE_boolean('decay_staircase',False,
                           """Staircase learning rate decay by integer division""")
 
+# Flags used in testing
+tf.app.flags.DEFINE_string('model','../data/model',
+                          """Directory for model checkpoints""")
 
+tf.app.flags.DEFINE_integer('batch_size_eval',2**9,
+                            """Eval batch size""")
+tf.app.flags.DEFINE_integer('eval_interval_secs', 60,
+                             'Time between test runs')
+
+tf.app.flags.DEFINE_string('device','/gpu:0',
+                          """Device for graph placement""")
+
+tf.app.flags.DEFINE_string('eval_path','../data/',
+                           """Base directory for test/validation data""")
+tf.app.flags.DEFINE_string('filename_pattern_eval','val/words-*',
+                           """File pattern for test input data""")
+tf.app.flags.DEFINE_integer('num_input_threads_eval',4,
+                          """Number of readers for input data""")
+
+# Shared flags
 tf.app.flags.DEFINE_integer('max_num_steps', 2**21,
                             """Number of optimization steps to run""")
 
@@ -44,21 +63,3 @@ tf.app.flags.DEFINE_integer('length_threshold',None,
                             """Limit of input string length width""")
 
 
-#Flags used in testing
-tf.app.flags.DEFINE_string('model','../data/model',
-                          """Directory for model checkpoints""")
-
-tf.app.flags.DEFINE_integer('batch_size_eval',2**9,
-                            """Eval batch size""")
-tf.app.flags.DEFINE_integer('test_interval_secs', 60,
-                             'Time between test runs')
-
-tf.app.flags.DEFINE_string('device','/gpu:0',
-                          """Device for graph placement""")
-
-tf.app.flags.DEFINE_string('test_path','../data/',
-                           """Base directory for test/validation data""")
-tf.app.flags.DEFINE_string('filename_pattern_test','val/words-*',
-                           """File pattern for test input data""")
-tf.app.flags.DEFINE_integer('num_input_threads_eval',4,
-                          """Number of readers for input data""")

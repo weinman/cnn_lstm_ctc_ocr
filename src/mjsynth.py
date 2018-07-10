@@ -71,15 +71,17 @@ def element_length_fn(image, width, label, length, text, filename):
     return width
 
 def postbatch_fn(image, width, label, length, text, filename):
+    # Batching complete, so now we can re-sparsify our labels for ctc_loss
     label = tf.cast(tf.deserialize_many_sparse(label, tf.int64),
                     tf.int32)
     
-    # Format relevant features
+    # Format relevant features for estimator ingestion
     features = {
-        "image" : image, 
-        "width" : width, 
-        "length": length,
-        "text"  : text
+        "image"   : image, 
+        "width"   : width,
+        "length"  : length,
+        "text"    : text,
+        "filename": filename,
     }
 
     return features, label
