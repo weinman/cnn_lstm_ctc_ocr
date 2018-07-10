@@ -34,7 +34,6 @@ def get_dataset(args):
                                       buffer_size=capacity)
     return dataset.prefetch(capacity)
 
-# https://www.tensorflow.org/programmers_guide/datasets#consuming_tfrecord_data
 def preprocess_fn(data):
     """Parse the elements of the dataset"""
 
@@ -62,7 +61,6 @@ def preprocess_fn(data):
     text = features['text/string']
     filename = features['image/filename']
 
-    # Prepare image
     image = _preprocess_image(image)
 
     return image,width,label,length,text,filename
@@ -98,9 +96,7 @@ def _get_filenames(base_dir, file_patterns=['*.tfrecord']):
     return data_files
 
 def _preprocess_image(image):
-    # Rescale from uint8([0,255]) to float([-0.5,0.5])
-    image = tf.image.convert_image_dtype(image, tf.float32)
-    image = tf.subtract(image, 0.5)
+    image = pipeline.rescale_image(image)
 
     # Pad with copy of first row to expand to 32 pixels height
     first_row = tf.slice(image, [0, 0, 0], [1, -1, -1])

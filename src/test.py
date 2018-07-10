@@ -56,7 +56,9 @@ def main(argv=None):
                                         config=custom_config)
     
     while True:
-        evaluations = classifier.evaluate(input_fn=_input_fn)
+        # NOTE: steps=1 is here so that unterminated data streams work
+        # This should be changed once batch-level results are figured out
+        evaluations = classifier.evaluate(input_fn=_input_fn, steps=1)
         print(evaluations)
 
 if __name__ == '__main__':

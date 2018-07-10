@@ -2,7 +2,7 @@ import tensorflow as tf
 import model
 import mjsynth
 import flags
-import pipeline
+import charset
 
 FLAGS = tf.app.flags.FLAGS
 optimizer = 'Adam'
@@ -91,7 +91,7 @@ def model_fn (features, labels, mode):
                                                           width, 
                                                           mode)
     logits = model.rnn_layers(conv_features, sequence_length,
-                                   pipeline.num_classes())
+                                   charset.num_classes())
 
     #Training the model
     if mode == tf.estimator.ModeKeys.TRAIN:
@@ -104,7 +104,7 @@ def model_fn (features, labels, mode):
     #Testing the model
     elif mode == tf.estimator.ModeKeys.EVAL:
         with tf.device(FLAGS.device):
-            label = labels# features['label']
+            label = labels
             length = features['length']
 
             loss,label_error,sequence_error = _get_testing(

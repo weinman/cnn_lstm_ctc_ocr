@@ -19,11 +19,7 @@ import tensorflow as tf
 import numpy as np
 from map_generator import data_generator
 import pipeline
-
-# The list (well, string) of valid output characters
-# If any example contains a character not found here, an error will result
-# from the calls to .index in the decoder below
-out_charset=pipeline.out_charset
+import charset
 
 def get_dataset(args=None):
     """
@@ -32,21 +28,20 @@ def get_dataset(args=None):
     """
     return tf.data.Dataset.from_generator(_generator_wrapper, 
                (tf.string, tf.int32, tf.int32), # Output Types
-               (tf.TensorShape([]),             # Shape 1st element
-               (tf.TensorShape((32, None, 3))), # Shape 2nd element
-               (tf.TensorShape([None]))))       # Shape 3rd element
+               (tf.TensorShape([]),             # Text shape
+               (tf.TensorShape((32, None, 3))), # Image shape
+               (tf.TensorShape([None]))))       # Labels shape
 
 def preprocess_fn(caption, image, labels):
     """Prepare dataset for ingestion"""
 
-    #NOTE: final image should be pre-grayed by opencv *before* generation
-    image = tf.image.rgb_to_grayscale(image) 
     image = _preprocess_image(image)
 
     # Width is the 2nd element of the image tuple
     width = tf.size(image[1]) 
 
-    # Length is the length of labels - 1 (because labels has -1 EOS token here)
+    # Length is the length of labels - 1
+    # (because labels has -1 EOS token here)
     length = tf.subtract(tf.size(labels), -1) 
 
     text = caption
@@ -81,8 +76,8 @@ def _generator_wrapper():
         caption = data[0]
         image = data[1]
 
-        # Transform string text to sequence of indices using charset
-        labels = [out_charset.index(c) for c in list(caption)]
+        # Transform string text to sequence of indices using charset dict
+        labels = [charset.out_charset_dict[c] for c in list(caption)]
         
         # Add in -1 as an EOS token for sparsification in postbatch_fn
         labels.append(-1)
@@ -90,8 +85,9 @@ def _generator_wrapper():
         yield caption, image, labels
 
 def _preprocess_image(image):
-    # Rescale from uint8([0,255]) to float([-0.5,0.5])
-    image = tf.image.convert_image_dtype(image, tf.float32)
-    image = tf.subtract(image, 0.5)
+    # Final image should be pre-grayed in opencv *before* generation
+    image = tf.image.rgb_to_grayscale(image) 
+    
+    image = pipeline.rescale_image(image)
 
     return image

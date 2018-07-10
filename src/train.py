@@ -19,6 +19,7 @@ import tensorflow as tf
 from tensorflow.contrib import learn
 
 import pipeline
+import charset
 import model
 import model_fn
 import filters

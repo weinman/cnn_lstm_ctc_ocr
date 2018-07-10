@@ -1,36 +1,34 @@
 import tensorflow as tf
 import numpy as np
 
-# The list (well, string) of valid output characters
-# If any example contains a character not found here, 
-# you'll get a runtime error when this is encountered.
-out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-_num_classes = len(out_charset)
-
-def get_data(static,
+def get_data(static_data,
              base_dir=None,
              file_patterns=None,
              num_threads=4,
              batch_size=32,
              boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
              input_device=None,
-             num_epoch=None,
+             num_epochs=None,
              filter_fn=None):
     
     # Elements to be buffered
     num_buffered_elements = num_threads*batch_size*2
 
     # Get correct import and args for given pipeline
-    if static:
+    # `dpipe` will be a variable for the package name
+    if static_data:
         import mjsynth as dpipe
-        args = (base_dir, file_patterns, num_threads, num_buffered_elements)
+        dpipe_args = (base_dir, 
+                      file_patterns, 
+                      num_threads, 
+                      num_buffered_elements)
     else:
         import maptextsynth as dpipe
-        args = None # Place future args for synthetic data here...
+        dpipe_args = None # Place future args for synthetic data here...
 
     with tf.device(input_device):
         # Get raw data
-        dataset = dpipe.get_dataset(args).prefetch(num_buffered_elements)
+        dataset = dpipe.get_dataset(dpipe_args).prefetch(num_buffered_elements)
         
         # Preprocess data
         dataset = dataset.map(dpipe.preprocess_fn, 
@@ -46,11 +44,11 @@ def get_data(static,
             dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
                 element_length_func=dpipe.element_length_fn,
                 bucket_batch_sizes=np.full(len(boundaries)+1, batch_size),
-                bucket_boundaries=boundaries,)) 
+                bucket_boundaries=boundaries)) 
         else:
             # Dynamically pad batches to match largest in batch
             dataset = dataset.padded_batch(batch_size, 
-                                           padded_shapes=dataset.output_shapes,)
+                                           padded_shapes=dataset.output_shapes)
 
         # Update to account for batching
         num_buffered_elements = num_threads*2
@@ -58,15 +56,23 @@ def get_data(static,
         dataset = dataset.prefetch(num_buffered_elements)
         
         # Repeat for num_epochs  
-        if num_epoch and static:
+        if num_epochs and static_data:
             dataset = dataset.repeat(num_epoch)
+        # Repeat indefinitely if no num_epochs is specified
+        elif static_data:
+            dataset = dataset.repeat()
 
-        # Convert labels to sparse tensor for CNN purposes
+        # Prepare dataset for Estimator ingestion
+        # ie: sparsify labels for CTC operations (eg loss, decoder)
+        # and convert elements to be [features, label]
         dataset = dataset.map(dpipe.postbatch_fn,
                               num_parallel_calls=num_threads)
         dataset = dataset.prefetch(num_buffered_elements)
         
     return dataset
 
-def num_classes():
-    return _num_classes
+def rescale_image(image):
+    # Rescale from uint8([0,255]) to float([-0.5,0.5])
+    image = tf.image.convert_image_dtype(image, tf.float32)
+    image = tf.subtract(image, 0.5)
+    return image
