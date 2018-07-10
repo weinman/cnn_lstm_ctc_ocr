@@ -26,12 +26,20 @@ def get_dataset(args):
     num_threads = args[2]
     capacity = args[3]
 
+    # Get filenames as list of tensors
+    tensor_filenames = _get_filenames(base_dir, file_patterns)
+
     # Get filenames into a dataset format
-    filenames = tf.data.Dataset.from_tensor_slices(
-        _get_filenames(base_dir, file_patterns))
-    dataset = tf.data.TFRecordDataset(filenames, 
+    ds_filenames = tf.data.Dataset.from_tensor_slices(tensor_filenames)
+
+    # Shuffle for some stochasticity
+    ds_filenames = ds_filenames.shuffle(buffer_size=len(tensor_filenames),
+                                     reshuffle_each_iteration=True)
+    
+    dataset = tf.data.TFRecordDataset(ds_filenames, 
                                       num_parallel_reads=num_threads,
                                       buffer_size=capacity)
+
     return dataset.prefetch(capacity)
 
 def preprocess_fn(data):
