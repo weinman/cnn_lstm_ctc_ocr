@@ -46,7 +46,7 @@ def _get_input_stream():
                                        batch_size=FLAGS.batch_size_train,
                                        input_device=FLAGS.input_device,
                                        filter_fn=filters.dyn_filter_by_width)
-    print('here')
+
     iterator = ds.make_one_shot_iterator()
 
     if (FLAGS.static_data):

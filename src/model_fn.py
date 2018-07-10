@@ -5,6 +5,7 @@ import flags
 import pipeline
 
 FLAGS = tf.app.flags.FLAGS
+optimizer = 'Adam'
 
 def _get_training(rnn_logits,label,sequence_length):
     """Set up training ops"""
@@ -89,7 +90,7 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
         #tf.summary.scalar( 'loss', loss )
         #tf.summary.scalar( 'label_error', label_error )
         #tf.summary.scalar( 'sequence_error', sequence_error )
-    return loss, batch_num_label_errors, batch_num_sequence_errors,batch_num_labels
+    return loss, batch_num_label_errors, batch_num_sequence_errors, batch_num_labels
 
 
 def model_fn (features, labels, mode):
@@ -97,7 +98,7 @@ def model_fn (features, labels, mode):
 
     image = features['image']
     width = features['width']
-    optimizer = features['optimizer']
+
 
     #NOT SURE WHAT DEVICE TO PUT THESE COMPUTATIONS IN
     conv_features,sequence_length = model.convnet_layers( image, 
@@ -130,13 +131,15 @@ def model_fn (features, labels, mode):
                                               loss=loss, 
                                               eval_metric_ops=
                                               {'label_error':
-                                               label_err_metric_fn(label_error, total_labels),
+                                               label_err_metric_fn
+                                               (label_error, total_labels),
                                                'sequence_error':
-                                               seq_err_metric_fn(sequence_error, length)},
+                                               seq_err_metric_fn
+                                               (sequence_error, length)},
                                               train_op=None)
 
 def label_err_metric_fn(batch_num_label_error, batch_total_labels):
-    print('here')
+    
     var_collections=[tf.GraphKeys.LOCAL_VARIABLES]
 
     # Variables to tally across batches (all initially zero)
