@@ -69,11 +69,11 @@ def preprocess_fn(caption, image, labels):
 def postbatch_fn(image, width, label, length, text):
     """ 
     Prepare dataset for ingestion by Estimator.
-    Sparsifies labels, and squanches the rest of the components into feature map
+    Sparsifies labels, and 'packs' the rest of the components into feature map
     """
 
     # Convert dense to sparse with EOS token of -1
-    # Labels must be sparse for ctc_loss
+    # Labels must be sparse for ctc functions (loss, decoder, etc)
     label = tf.contrib.layers.dense_to_sparse(label, -1)
     
     # Format relevant features for estimator ingestion
