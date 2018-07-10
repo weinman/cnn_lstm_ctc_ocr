@@ -1,7 +1,5 @@
 import tensorflow as tf
 
-FLAGS = tf.app.flags.FLAGS
-
 #Flags used in training
 tf.app.flags.DEFINE_string('train_output','../data/model',
                            """Directory for event logs and checkpoints""")

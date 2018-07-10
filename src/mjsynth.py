@@ -33,11 +33,6 @@ def get_dataset(args):
                                       num_parallel_reads=num_threads,
                                       buffer_size=capacity)
     return dataset.prefetch(capacity)
-    
-def postbatch_fn(image, width, label, length, text, filename):
-    label = tf.cast(tf.deserialize_many_sparse(label, tf.int64),
-                    tf.int32)
-    return image, width, label, length, text, filename
 
 # https://www.tensorflow.org/programmers_guide/datasets#consuming_tfrecord_data
 def preprocess_fn(data):
@@ -74,6 +69,20 @@ def preprocess_fn(data):
 
 def element_length_fn(image, width, label, length, text, filename):
     return width
+
+def postbatch_fn(image, width, label, length, text, filename):
+    label = tf.cast(tf.deserialize_many_sparse(label, tf.int64),
+                    tf.int32)
+    
+    # Format relevant features
+    features = {
+        "image" : image, 
+        "width" : width, 
+        "length": length,
+        "text"  : text
+    }
+
+    return features, label
 
 def _get_filenames(base_dir, file_patterns=['*.tfrecord']):
     """Get a list of record files"""

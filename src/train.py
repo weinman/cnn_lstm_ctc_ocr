@@ -28,46 +28,24 @@ FLAGS = tf.app.flags.FLAGS
 # For displaying various statistics while training
 tf.logging.set_verbosity(tf.logging.INFO)
 
-# Non-configurable parameters
-optimizer='Adam'
-
-def _get_input_stream():
-    if(FLAGS.static_data):
-        ds = pipeline.get_static_data(FLAGS.train_path, 
-                                      str.split(
-                                          FLAGS.filename_pattern_train,','),
-                                      num_threads=FLAGS.num_input_threads_train,
-                                      batch_size=FLAGS.batch_size_train,
-                                      input_device=FLAGS.input_device,
-                                      filter_fn=None)
-                                    
-    else:
-        ds = pipeline.get_dynamic_data(num_threads=FLAGS.num_input_threads_train,
-                                       batch_size=FLAGS.batch_size_train,
-                                       input_device=FLAGS.input_device,
-                                       filter_fn=filters.dyn_filter_by_width)
-
-    iterator = ds.make_one_shot_iterator()
-
-    if (FLAGS.static_data):
-        image, width, label, _, _, _ = iterator.get_next()
-    else:
-        image, width, label, _, _ = iterator.get_next()
-
-    # The input for the model function 
-    features = {"image": image, "width": width, "optimizer": optimizer}
-    
-    return features, label
+def _input_fn():
+    # Get data according to flags
+    dataset = pipeline.get_data(FLAGS.static_data,
+                           base_dir=FLAGS.train_path,
+                           file_patterns=str.split(FLAGS.filename_pattern_train,
+                                                   ','),
+                           num_threads=FLAGS.num_input_threads_train,
+                           batch_size=FLAGS.batch_size_train,
+                           input_device=FLAGS.input_device,
+                           filter_fn=None)
+    return dataset
 
 def _get_session_config():
     """Setup session config to soften device placement"""
 
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
-
     config=tf.ConfigProto(
         allow_soft_placement=True, 
-        log_device_placement=False,
-        gpu_options=gpu_options)
+        log_device_placement=False,)
 
     return config 
 
@@ -82,7 +60,7 @@ def main(argv=None):
                                         config=custom_config)
 
     # Train the model
-    classifier.train(input_fn=lambda: _get_input_stream())
+    classifier.train(input_fn=_input_fn)
 
 if __name__ == '__main__':
     tf.app.run()

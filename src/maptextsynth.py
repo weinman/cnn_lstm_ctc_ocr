@@ -56,7 +56,16 @@ def preprocess_fn(caption, image, labels):
 def postbatch_fn(image, width, label, length, text):
     # Convert dense to sparse with EOS token of -1
     label = tf.contrib.layers.dense_to_sparse(label, -1)
-    return image, width, label, length, text
+    
+    # Format relevant features
+    features = {
+        "image" : image, 
+        "width" : width, 
+        "length": length,
+        "text"  : text
+    }
+
+    return features, label
 
 def element_length_fn(image, width, label, length, text):
     return width
