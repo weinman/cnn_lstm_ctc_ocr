@@ -29,21 +29,6 @@ optimizer = 'Adam'
 tf.logging.set_verbosity(tf.logging.WARN)
 tf.logging.set_verbosity(tf.logging.INFO)
 
-class LoggerHook(tf.train.SessionRunHook):
-    """Logs metrics after each batch"""
-
-    def begin(self):
-        self._step = -1
-
-    def before_run(self, run_context):
-        self._step += 1
-        return tf.train.SessionRunArgs(loss)
-
-    def after_run(self, run_context, run_values):
-        loss = run_values.results
-        print(loss)
-
-
 def _get_input_stream():
     if(FLAGS.static_data):
         ds = pipeline.get_static_data(FLAGS.test_path, 
@@ -64,14 +49,15 @@ def _get_input_stream():
 
     iterator = ds.make_one_shot_iterator() 
     
-    image, width, label, length, _, _ = iterator.get_next()
+    image, width, label, length, text, filename = iterator.get_next()
 
     # The input for the model function 
     features = {"image": image, 
                 "width": width, 
                 "length": length, 
-                "label": label, 
-                "optimizer": optimizer}
+                "label": label,
+                "text": text,
+                "filename": filename}
 
     return features, label
 

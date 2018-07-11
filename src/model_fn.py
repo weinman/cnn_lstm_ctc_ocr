@@ -6,7 +6,9 @@ import pipeline
 
 FLAGS = tf.app.flags.FLAGS
 optimizer = 'Adam'
+
 tf.logging.set_verbosity(tf.logging.INFO)
+
 def _get_training(rnn_logits,label,sequence_length):
     """Set up training ops"""
     with tf.name_scope("train"):
@@ -87,7 +89,6 @@ def model_fn (features, labels, mode):
     image = features['image']
     width = features['width']
 
-
     #NOT SURE WHAT DEVICE TO PUT THESE COMPUTATIONS IN
     conv_features,sequence_length = model.convnet_layers( image, 
                                                           width, 
@@ -103,36 +104,89 @@ def model_fn (features, labels, mode):
                                           loss=loss, 
                                           train_op=train_op)
 
-    #Testing the model
+    #Evaluating the model
     elif mode == tf.estimator.ModeKeys.EVAL:
 
         with tf.device(FLAGS.device):
             label = features['label']
             length = features['length']
+            filename = features['filename']
+            text = features['text']
 
-            loss,label_error,sequence_error, total_labels, predictions = _get_testing(logits,sequence_length,label,length)
+            loss,\
+                label_error,\
+                sequence_error, \
+                total_labels, \
+                predictions = _get_testing(logits,sequence_length,label,length)
 
-            mean_label_error, update_op_label, total_num_label_errors, total_num_labels= label_err_metric_fn(label_error, total_labels)
-
-            mean_sequence_error, update_op_seq, total_num_sequence_errors,total_num_sequences= seq_err_metric_fn(sequence_error, length)
-
-            #metrics = [total_num_label_errors, total_num_labels,total_num_sequence_errors,total_num_sequences]
+            # Getting the label errors
+            mean_label_error, \
+                update_op_label, \
+                total_num_label_errors, \
+                total_num_labels= label_err_metric_fn(label_error, total_labels)
+            
+            #Getting the sequence errors
+            mean_sequence_error,\
+                update_op_seq,\
+                total_num_sequence_errors,\
+                total_num_sequences= seq_err_metric_fn(sequence_error, length)
+            
+            # Stack it into one tensor
             metrics = tf.convert_to_tensor(tf.stack([total_num_label_errors,
                                                      total_num_labels,
                                                      total_num_sequence_errors,
-                                                     total_num_sequences], axis=0))
+                                                     total_num_sequences], 
+                                                    axis=0))
 
-            return tf.estimator.EstimatorSpec(mode=mode, 
-                                              loss=loss, 
-                                              eval_metric_ops=
-                                              {'label_error':
-                                               (mean_label_error, 
-                                                update_op_label),
-                                               'sequence_error':
-                                               (mean_sequence_error,
-                                                update_op_seq),
-                                               'misc_metrics': (metrics, metrics)})
+            if FLAGS.verbose == True:
+                #Get the list of extra information 
+                file_list, update_op_fname = filename_metric_fn(filename, \
+                                                                text, \
+                                                                predictions)
+            
+                return tf.estimator.EstimatorSpec(mode=mode, 
+                                                  loss=loss, 
+                                                  eval_metric_ops=
+                                                  {'label_error':
+                                                   (mean_label_error, 
+                                                    update_op_label),
+                                                   'sequence_error':
+                                                   (mean_sequence_error,
+                                                    update_op_seq),
+                                                   'misc_metrics':\
+                                                   (metrics, metrics),
+                                                   'filename':\
+                                                   (file_list, update_op_fname)})
+            else:
+                return tf.estimator.EstimatorSpec(mode=mode, 
+                                                  loss=loss, 
+                                                  eval_metric_ops=
+                                                  {'label_error':
+                                                   (mean_label_error, 
+                                                    update_op_label),
+                                                   'sequence_error':
+                                                   (mean_sequence_error,
+                                                    update_op_seq),
+                                                   'misc_metrics':\
+                                                   (metrics, metrics)})
 
+
+def filename_metric_fn(filename, text, predictions):
+    var_collections=[tf.GraphKeys.LOCAL_VARIABLES]
+
+    # Variable that holds the list for info if FLAGS.verbose is True
+    file_list = tf.Variable([], 
+                            expected_shape=tf.TensorShape([None]), 
+                            dtype=tf.string,collections=var_collections)
+
+    # Update the file list
+    single_file = tf.concat([text, filename], axis=0)
+    update_op = tf.concat([file_list, single_file], axis = 0)
+
+    # Final list
+    lst_tensor = tf.convert_to_tensor(file_list)
+
+    return lst_tensor, update_op
 
 def label_err_metric_fn(batch_num_label_error, batch_total_labels):
     
@@ -196,5 +250,6 @@ def seq_err_metric_fn(batch_num_sequence_errors, label_length):
                                  total_num_sequences,
                                  name='sequence_error')
     
-    return sequence_error, update_op, total_num_sequence_errors,total_num_sequences
+    return sequence_error, update_op, total_num_sequence_errors,\
+        total_num_sequences
 

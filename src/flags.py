@@ -64,3 +64,8 @@ tf.app.flags.DEFINE_string('filename_pattern_test','val/words-*',
                            """File pattern for test input data""")
 tf.app.flags.DEFINE_integer('num_input_threads_eval',4,
                           """Number of readers for input data""")
+
+
+#Flags used for evalution
+tf.app.flags.DEFINE_bool('verbose',True,
+                         """Print all predictions, ground truth, and filenames""")
