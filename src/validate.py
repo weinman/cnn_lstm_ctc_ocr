@@ -24,7 +24,7 @@ from PIL import Image
 import tensorflow as tf
 from tensorflow.contrib import learn
 
-import mjsynth
+import pipeline
 import model
 from lexicon import dictionary_from_file
 
@@ -70,11 +70,13 @@ def _preprocess_image(image):
 def _get_input():
     """Set up and return image and width placeholder tensors"""
 
-    # Raw image as placeholder to be fed one-by-one by dictionary
-    image = tf.placeholder(tf.uint8, shape=[31, None, 1])
-    width = tf.placeholder(tf.int32,shape=[]) # for ctc_loss
+    for line in sys.stdin:
+        image_data = _get_image(line.rstrip())
+        features = {"image": image_data,
+                    "width": image_data.shape[1]}
+        yield features
 
-    return image,width
+    #return image,width
 
 
 def _get_output(rnn_logits,sequence_length):
@@ -83,10 +85,10 @@ def _get_output(rnn_logits,sequence_length):
     """
     with tf.name_scope("test"):
 	if FLAGS.lexicon:
-	    dict_tensor = _get_dictionary_tensor(FLAGS.lexicon, mjsynth.out_charset)
+	    dict_tensor = _get_dictionary_tensor(FLAGS.lexicon, pipeline.out_charset)
 	    predictions,_ = tf.nn.ctc_beam_search_decoder_trie(rnn_logits,
 	    					   sequence_length,
-	    					   alphabet_size=mjsynth.num_classes() ,
+	    					   alphabet_size=pipeline.num_classes() ,
 	    					   dictionary=dict_tensor,
 	    					   beam_width=128,
 	    					   top_paths=1,
@@ -109,40 +111,52 @@ def _get_session_config():
     return config
 
 
-def _get_checkpoint():
-    """Get the checkpoint path from the given model output directory"""
-    ckpt = tf.train.get_checkpoint_state(FLAGS.model)
-
-    if ckpt and ckpt.model_checkpoint_path:
-        ckpt_path=ckpt.model_checkpoint_path
-    else:
-        raise RuntimeError('No checkpoint file found')
-
-    return ckpt_path
-
-
-def _get_init_trained():
-    """Return init function to restore trained model from a given checkpoint"""
-    saver_reader = tf.train.Saver(
-        tf.get_collection(tf.GraphKeys.GLOBAL_STEP) + 
-        tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-    )
-    
-    init_fn = lambda sess,ckpt_path: saver_reader.restore(sess, ckpt_path)
-    return init_fn
-
 def _get_string(labels):
     """Transform an 1D array of labels into the corresponding character string"""
-    string = ''.join([mjsynth.out_charset[c] for c in labels])
+    string = ''.join([pipeline.out_charset[c] for c in labels])
     return string
 
 def _get_dictionary_tensor(dictionary_path, charset):
     return tf.sparse_tensor_to_dense(tf.to_int32(
 	dictionary_from_file(dictionary_path, charset)))
 
+def model_fn(features, labels, mode):
+
+    feature = next(features)
+    image = feature['image']
+    width = feature['width']
+
+    proc_image = _preprocess_image(image)
+    proc_image = tf.reshape(proc_image,[1,32,-1,1]) # Make first dim batch
+
+    with tf.device(FLAGS.device):
+        features,sequence_length = model.convnet_layers( proc_image, width, 
+                                                         mode)
+        logits = model.rnn_layers( features, sequence_length,
+                                   pipeline.num_classes() )
+        prediction = _get_output( logits,sequence_length)
+
+        ret = tf.sparse_to_dense(prediction[0].indices, 
+                                 prediction[0].dense_shape, 
+                                 prediction[0].values, default_value=0) 
+
+        return tf.estimator.EstimatorSpec(mode=mode,predictions=(ret))
+
 def main(argv=None):
 
-    with tf.Graph().as_default():
+    custom_config = tf.estimator.RunConfig(session_config=_get_session_config())
+
+    classifier = tf.estimator.Estimator(model_fn=model_fn, 
+                                        model_dir=FLAGS.model,
+                                        config=custom_config)
+
+    predictions = classifier.predict(input_fn=lambda: _get_input())
+
+    for item in predictions:
+        print _get_string(item)
+    #print _get_string((next(predictions)))
+
+    """with tf.Graph().as_default():
         image,width = _get_input() # Placeholder tensors
 
         proc_image = _preprocess_image(image)
@@ -152,7 +166,7 @@ def main(argv=None):
             features,sequence_length = model.convnet_layers( proc_image, width, 
                                                              mode)
             logits = model.rnn_layers( features, sequence_length,
-                                       mjsynth.num_classes() )
+                                       pipeline.num_classes() )
             prediction = _get_output( logits,sequence_length)
 
         session_config = _get_session_config()
@@ -173,7 +187,7 @@ def main(argv=None):
                 # Get prediction for single image (isa SparseTensorValue)
                 [output] = sess.run(prediction,{ image: image_data, 
                                                  width: image_data.shape[1]} )
-                print(_get_string(output.values))
+                print(_get_string(output.values))"""
 
 if __name__ == '__main__':
     tf.app.run()
