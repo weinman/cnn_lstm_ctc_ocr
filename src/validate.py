@@ -152,8 +152,11 @@ def main(argv=None):
 
     predictions = classifier.predict(input_fn=lambda: _get_input())
 
-    for item in predictions:
-        print _get_string(item)
+    #for item in predictions:
+     #   print _get_string(item)
+
+    while True:
+         print(_get_string(next(predictions)))
     #print _get_string((next(predictions)))
 
     """with tf.Graph().as_default():
