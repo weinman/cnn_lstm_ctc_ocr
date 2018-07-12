@@ -80,7 +80,8 @@ def _get_testing(rnn_logits,sequence_length,label,label_length):
         batch_num_labels = tf.cast( batch_num_labels, tf.int64)
         tf.identity(batch_num_label_errors, name='lab')
         
-    return loss, batch_num_label_errors, batch_num_sequence_errors, batch_num_labels, predictions
+    return loss, batch_num_label_errors, batch_num_sequence_errors, \
+        batch_num_labels, predictions
 
 
 def model_fn (features, labels, mode):
@@ -107,11 +108,14 @@ def model_fn (features, labels, mode):
     #Evaluating the model
     elif mode == tf.estimator.ModeKeys.EVAL:
 
-        with tf.device(FLAGS.device):
+        with tf.device(FLAGS.device):  
+            continuous_eval = features['continuous_eval']
             label = features['label']
             length = features['length']
-            filename = features['filename']
-            text = features['text']
+
+            if (continuous_eval == False):
+                filename = features['filename']
+                text = features['text']
 
             loss,\
                 label_error,\
@@ -124,12 +128,20 @@ def model_fn (features, labels, mode):
                 update_op_label, \
                 total_num_label_errors, \
                 total_num_labels= label_err_metric_fn(label_error, total_labels)
-            
+       
             #Getting the sequence errors
             mean_sequence_error,\
                 update_op_seq,\
                 total_num_sequence_errors,\
                 total_num_sequences= seq_err_metric_fn(sequence_error, length)
+            
+            if (continuous_eval == True):
+                global_step = tf.train.get_or_create_global_step()
+                mean_sequence_error = tf.Print(mean_sequence_error, 
+                                               [loss,
+                                                mean_sequence_error,
+                                                mean_label_error,
+                                                global_step])
             
             # Stack it into one tensor
             metrics = tf.convert_to_tensor(tf.stack([total_num_label_errors,
@@ -143,7 +155,7 @@ def model_fn (features, labels, mode):
                 file_list, update_op_fname = filename_metric_fn(filename, \
                                                                 text, \
                                                                 predictions)
-            
+
                 return tf.estimator.EstimatorSpec(mode=mode, 
                                                   loss=loss, 
                                                   eval_metric_ops=

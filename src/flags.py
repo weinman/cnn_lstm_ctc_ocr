@@ -67,5 +67,5 @@ tf.app.flags.DEFINE_integer('num_input_threads_eval',4,
 
 
 #Flags used for evalution
-tf.app.flags.DEFINE_bool('verbose',True,
+tf.app.flags.DEFINE_bool('verbose',False,
                          """Print all predictions, ground truth, and filenames""")
