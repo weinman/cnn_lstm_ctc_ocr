@@ -106,9 +106,7 @@ def _generator_wrapper():
     """
     gen = data_generator()
     while True:
-        data = next( gen )
-        caption = data[0]
-        image = data[1]
+        caption, image = next( gen )
 
         # Transform string text to sequence of indices using charset dict
         label = [charset.out_charset_dict[c] for c in list( caption )]
