@@ -76,7 +76,7 @@ def main( argv=None ):
                                          config=custom_config )
 
     # Train the model
-    classifier.train( input_fn=_input_fn )
+    classifier.train( input_fn=_input_fn, max_steps=FLAGS.max_num_steps )
 
 if __name__ == '__main__':
     tf.app.run()
