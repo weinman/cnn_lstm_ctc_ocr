@@ -50,7 +50,8 @@ def _get_training( rnn_logits, label, sequence_length ):
 
 
 def _get_testing( rnn_logits, sequence_length, label, label_length ):
-    """Create ops for testing (all scalars): 
+    """
+    Create ops for testing (all scalars): 
        loss: CTC loss function value, 
        label_error:  Batch-normalized edit distance on beam search max
        sequence_error: Batch-normalized sequence error rate
@@ -80,7 +81,7 @@ def _get_testing( rnn_logits, sequence_length, label, label_length ):
     return loss, label_error, sequence_error
 
 
-def model_fn (features, labels, mode):
+def model_fn ( features, labels, mode ):
     """Model function for the estimator object"""
 
     image = features['image']
@@ -90,10 +91,11 @@ def model_fn (features, labels, mode):
     conv_features,sequence_length = model.convnet_layers( image, 
                                                           width, 
                                                           mode )
+    
     logits = model.rnn_layers( conv_features, sequence_length,
                                    charset.num_classes() )
 
-    #Training the model
+    # Training the model
     if mode == tf.estimator.ModeKeys.TRAIN:
         with tf.device( FLAGS.train_device ):
             train_op, loss = _get_training( logits, labels, sequence_length )
@@ -101,7 +103,7 @@ def model_fn (features, labels, mode):
                                                loss=loss, 
                                                train_op=train_op )
 
-    #Testing the model
+    # Testing the model
     elif mode == tf.estimator.ModeKeys.EVAL:
         with tf.device( FLAGS.device ):
             label = labels
