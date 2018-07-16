@@ -22,7 +22,8 @@ def get_data( static_data,
       num_epochs    : if None, data repeats infinitely (static data only)
       filter_fn     : filtering function
     Returns:
-      dataset : elements structured as [features, labels]
+      dataset : tf.data.Dataset object.
+                elements structured as [features, labels]
                 feature structure can be seen in postbatch_fn 
                 in mjsynth.py or maptextsynth.py for static or dynamic
                 data pipelines respectively
