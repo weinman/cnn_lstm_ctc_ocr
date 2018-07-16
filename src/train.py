@@ -66,8 +66,9 @@ def _get_session_config():
 
 def main( argv=None ):
 
-    custom_config = tf.estimator.RunConfig( session_config=_get_session_config(),
-                                            save_checkpoints_secs=30 )
+    custom_config = tf.estimator.RunConfig( 
+        session_config=_get_session_config(),
+        save_checkpoints_secs=30 )
     
     # Initialize the classifier
     classifier = tf.estimator.Estimator( model_fn=model_fn.model_fn, 

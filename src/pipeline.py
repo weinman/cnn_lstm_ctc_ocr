@@ -44,7 +44,8 @@ def get_data( static_data,
 
     with tf.device( input_device ):
         # Get raw data
-        dataset = dpipe.get_dataset( dpipe_args ).prefetch( num_buffered_elements )
+        dataset = dpipe.get_dataset( dpipe_args )
+        dataset = dataset.prefetch( num_buffered_elements )
         
         # Preprocess data
         dataset = dataset.map( dpipe.preprocess_fn, 
@@ -53,14 +54,16 @@ def get_data( static_data,
 
         # Remove input that doesn't fit necessary specifications
         if filter_fn:
-            dataset = dataset.filter( filter_fn ).prefetch( num_buffered_elements )
+            dataset = dataset.filter( filter_fn )
+            dataset = dataset.prefetch( num_buffered_elements )
 
         # Bucket and batch appropriately
         if boundaries:
             dataset = dataset.apply( tf.contrib.data.bucket_by_sequence_length(
                 element_length_func=dpipe.element_length_fn,
-                # Create a numpy array structured as [batch_size,...,batch_size]
-                bucket_batch_sizes=np.full( len( boundaries ) + 1, batch_size ),
+                # Create numpy array as follows: [batch_size,...,batch_size]
+                bucket_batch_sizes=np.full( len( boundaries ) + 1, 
+                                            batch_size ),
                 bucket_boundaries=boundaries ) ) 
         else:
             # Dynamically pad batches to match largest in batch

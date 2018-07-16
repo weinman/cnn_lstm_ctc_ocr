@@ -1,4 +1,5 @@
-# FILTERS:
+# READ THIS BEFORE WRITING YOUR OWN FILTER FUNCTION
+#
 # To be used as filter_fn's passed into call to pipeline.get_data
 # Filters for dynamic data must be written in the following structure:
 # * filter_fn(image, width, label, length, text)
@@ -9,7 +10,7 @@
 # label          : tf.int32, [?]
 # length         : tf.int32, []
 # text           : tf.string, []
-
+#
 # Filters for static data must be written in the following structure:
 # * filter_fn(image, width, label, length, text, filename)
 # VAR            : tf.dtype, shape
@@ -19,7 +20,7 @@
 # label          : tf.int64, SparseTensor [?]
 # length         : tf.int64, []
 # text, filename : tf.string, []
-
+#
 # Note: For more detailed information, refer to `_preprocess_fn`
 # in mjsynth.py and maptextsynth.py. Filtering is performed after
 # these transformations have been applied. Therefore, filter_fn args

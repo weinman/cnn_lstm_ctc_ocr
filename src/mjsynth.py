@@ -59,7 +59,10 @@ def preprocess_fn( data ):
     features = tf.parse_single_example( data, feature_map )
     
     # Initialize fields according to feature map
-    image = tf.image.decode_jpeg( features['image/encoded'], channels=1 ) #gray
+
+    # Convert to grayscale
+    image = tf.image.decode_jpeg( features['image/encoded'], channels=1 ) 
+
     width = tf.cast( features['image/width'], tf.int32 ) # for ctc_loss
     label = tf.serialize_sparse( features['image/labels'] ) # for batching
     length = features['text/length']
@@ -80,11 +83,11 @@ def postbatch_fn( image, width, label, length, text, filename ):
     
     # Format relevant features for estimator ingestion
     features = {
-        "image"   : image, 
-        "width"   : width,
-        "length"  : length,
-        "text"    : text,
-        "filename": filename,
+        "image"    : image, 
+        "width"    : width,
+        "length"   : length,
+        "text"     : text,
+        "filename" : filename,
     }
 
     return features, label
@@ -101,6 +104,7 @@ def _get_filenames( base_dir, file_patterns=['*.tfrecord'] ):
     return data_files
 
 def _preprocess_image( image ):
+    """Preprocess image: Rescale and fix image height"""
     image = pipeline.rescale_image( image )
 
     # Pad with copy of first row to expand to 32 pixels height

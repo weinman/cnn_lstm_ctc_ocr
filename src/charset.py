@@ -42,7 +42,9 @@ def get_strings( labels ):
     return strings
 
 def get_string( labels ):
-    """Transform an 1D array of labels into the corresponding character string"""
+    """
+    Transform an 1D array of labels into the corresponding character string
+    """
     string = ''.join( [out_charset_dict[c] for c in labels] )
     return string
 
