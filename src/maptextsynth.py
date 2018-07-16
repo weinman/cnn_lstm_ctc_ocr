@@ -31,7 +31,7 @@ def get_dataset( args=None ):
         (tf.string, tf.int32, tf.int32),   # Output Types
         (tf.TensorShape( [] ),             # Text shape
          tf.TensorShape( (32, None, 3) ),  # Image shape
-         tf.TensorShape( [None] ) ) )      # Labels shape
+         tf.TensorShape( [None] )) )       # Labels shape
     
 def preprocess_fn( caption, image, labels ):
     """
