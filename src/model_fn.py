@@ -5,7 +5,6 @@ import flags
 import charset
 
 FLAGS = tf.app.flags.FLAGS
-optimizer = 'Adam'
 
 def _get_training( rnn_logits, label, sequence_length ):
     """Set up training ops"""
