@@ -21,18 +21,19 @@ from map_generator import data_generator
 import pipeline
 import charset
 
-def get_dataset(args=None):
+def get_dataset( args=None ):
     """
     Get a dataset from generator (args currently just for compatibility)
     Format: [text|image|labels] -- types and shapes can be seen below 
     """
-    return tf.data.Dataset.from_generator(_generator_wrapper, 
-               (tf.string, tf.int32, tf.int32), # Output Types
-               (tf.TensorShape([]),             # Text shape
-               (tf.TensorShape((32, None, 3))), # Image shape
-               (tf.TensorShape([None]))))       # Labels shape
-
-def preprocess_fn(caption, image, labels):
+    return tf.data.Dataset.from_generator( 
+        _generator_wrapper, 
+        (tf.string, tf.int32, tf.int32),   # Output Types
+        (tf.TensorShape( [] ),             # Text shape
+         tf.TensorShape( (32, None, 3) ),  # Image shape
+         tf.TensorShape( [None] ) ) )      # Labels shape
+    
+def preprocess_fn( caption, image, labels ):
     """
     Reformat raw data for model trainer. 
     Intended to get data as formatted from get_dataset function.
@@ -53,20 +54,20 @@ def preprocess_fn(caption, image, labels):
                   tf.string tensor of shape []
     
     """
-    image = _preprocess_image(image)
+    image = _preprocess_image( image )
 
     # Width is the 2nd element of the image tuple
-    width = tf.size(image[1]) 
+    width = tf.size( image[1] ) 
 
     # Length is the length of labels - 1
     # (because labels has -1 EOS token here)
-    length = tf.subtract(tf.size(labels), -1) 
+    length = tf.subtract( tf.size( labels ), -1 ) 
 
     text = caption
 
     return image, width, labels, length, text
 
-def postbatch_fn(image, width, label, length, text):
+def postbatch_fn( image, width, label, length, text ):
     """ 
     Prepare dataset for ingestion by Estimator.
     Sparsifies labels, and 'packs' the rest of the components into feature map
@@ -74,7 +75,7 @@ def postbatch_fn(image, width, label, length, text):
 
     # Convert dense to sparse with EOS token of -1
     # Labels must be sparse for ctc functions (loss, decoder, etc)
-    label = tf.contrib.layers.dense_to_sparse(label, -1)
+    label = tf.contrib.layers.dense_to_sparse( label, -1 )
     
     # Format relevant features for estimator ingestion
     features = {
@@ -86,7 +87,7 @@ def postbatch_fn(image, width, label, length, text):
 
     return features, label
 
-def element_length_fn(image, width, label, length, text):
+def element_length_fn( image, width, label, length, text ):
     """ 
     Determine element length
     Note: mjsynth version of this function has extra parameter (filename)
@@ -101,27 +102,27 @@ def _generator_wrapper():
       caption : ground truth string
       image   : raw mat object image [32, ?, 3] 
       label   : list of indices corresponding to out_charset 
-                length=len(caption)
+                length=len( caption )
     """
     gen = data_generator()
     while True:
-        data = next(gen)
+        data = next( gen )
         caption = data[0]
         image = data[1]
 
         # Transform string text to sequence of indices using charset dict
-        label = [charset.out_charset_dict[c] for c in list(caption)]
+        label = [charset.out_charset_dict[c] for c in list( caption )]
         
         # Add in -1 as an EOS token for sparsification in postbatch_fn
-        label.append(-1)
+        label.append( -1 )
 
         yield caption, image, label
 
-def _preprocess_image(image):
+def _preprocess_image( image ):
     """Convert image to grayscale and rescale"""
     # Final image should be pre-grayed in opencv *before* generation
-    image = tf.image.rgb_to_grayscale(image) 
+    image = tf.image.rgb_to_grayscale( image ) 
     
-    image = pipeline.rescale_image(image)
+    image = pipeline.rescale_image( image )
 
     return image

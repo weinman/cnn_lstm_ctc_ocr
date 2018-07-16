@@ -7,16 +7,17 @@ import charset
 FLAGS = tf.app.flags.FLAGS
 optimizer = 'Adam'
 
-def _get_training(rnn_logits,label,sequence_length):
+def _get_training( rnn_logits,label,sequence_length ):
     """Set up training ops"""
-    with tf.name_scope("train"):
+    with tf.name_scope( "train" ):
 
         if FLAGS.tune_scope:
             scope=FLAGS.tune_scope
-        else:            scope="convnet|rnn"
+        else:
+            scope="convnet|rnn"
 
         rnn_vars = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES,
-                                       scope=scope)        
+                                      scope=scope )        
 
         loss = model.ctc_loss_layer(rnn_logits,label,sequence_length) 
 

@@ -25,52 +25,54 @@ import model_fn
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.logging.set_verbosity(tf.logging.WARN)
+tf.logging.set_verbosity( tf.logging.WARN )
 
 def _input_fn():
-    """Get dataset according to tf flags for Estimator ingestion
+    """
+    Get dataset according to tf flags for testing using Estimator
     Returns:
       dataset : elements structured as [features, labels]
                 feature structure can be seen in postbatch_fn 
-                in mjsynth/maptextsynth
+                in mjsynth.py or maptextsynth.py for static or dynamic
+                data pipelines respectively
     """
 
     # We only want a filter_fn if we have dynamic data (for now)
     filter_fn = None if FLAGS.static_data else filters.dyn_filter_by_width
 
     # Get data according to flags
-    dataset = pipeline.get_data(FLAGS.static_data,
-                                base_dir=FLAGS.eval_path,
-                                file_patterns=str.split(
-                                    FLAGS.filename_pattern_eval,
-                                    ','),
-                                num_threads=FLAGS.num_input_threads_eval,
-                                batch_size=FLAGS.batch_size_eval,
-                                input_device=FLAGS.input_device,
-                                filter_fn=filter_fn)
+    dataset = pipeline.get_data( FLAGS.static_data,
+                                 base_dir=FLAGS.eval_path,
+                                 file_patterns=str.split(
+                                     FLAGS.filename_pattern_eval,
+                                     ','),
+                                 num_threads=FLAGS.num_input_threads_eval,
+                                 batch_size=FLAGS.batch_size_eval,
+                                 bucket_boundaries=None,
+                                 input_device=FLAGS.input_device,
+                                 filter_fn=filter_fn )
     return dataset
 
 def _get_session_config():
     """Setup session config to soften device placement"""
-    config=tf.ConfigProto(
-        allow_soft_placement=True, 
-        log_device_placement=False)
+    config=tf.ConfigProto( allow_soft_placement=True, 
+                           log_device_placement=False )
 
     return config
 
-def main(argv=None):
-    custom_config = tf.estimator.RunConfig(session_config=_get_session_config())
+def main( argv=None ):
+    custom_config = tf.estimator.RunConfig( session_config=_get_session_config() )
 
     # Initialize the classifier
-    classifier = tf.estimator.Estimator(model_fn=model_fn.model_fn, 
-                                        model_dir=FLAGS.model,
-                                        config=custom_config)
+    classifier = tf.estimator.Estimator( model_fn=model_fn.model_fn, 
+                                         model_dir=FLAGS.model,
+                                         config=custom_config )
     
     while True:
         # NOTE: steps=1 is here so that unterminated data streams work
         # This should be changed once batch-level results are figured out
-        evaluations = classifier.evaluate(input_fn=_input_fn, steps=1)
-        print(evaluations)
+        evaluations = classifier.evaluate( input_fn=_input_fn, steps=100 )
+        print( evaluations )
 
 if __name__ == '__main__':
     tf.app.run()
