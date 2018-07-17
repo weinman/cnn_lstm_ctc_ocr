@@ -66,7 +66,7 @@ tf.app.flags.DEFINE_integer('num_input_threads',4,
 tf.app.flags.DEFINE_integer('width_threshold',None,
                             """Limit of input image width""")
 tf.app.flags.DEFINE_integer('length_threshold',None,
-"""Limit of input string length width""")
+                            """Limit of input string length width""")
 
 # For displaying various statistics while training
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -97,6 +97,8 @@ def _get_input_stream():
     else:
         image, width, label, _, _ = iterator.get_next()
 
+    #tf.summary.image('images',image) # Uncomment to see images in TensorBoard
+
     # The input for the model function 
     features = {"image": image, "width": width, "optimizer": optimizer}
     
@@ -105,29 +107,19 @@ def _get_input_stream():
 def _get_session_config():
     """Setup session config to soften device placement"""
 
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
-
     config=tf.ConfigProto(
         allow_soft_placement=True, 
-        log_device_placement=False,
-        gpu_options=gpu_options)
+        log_device_placement=False)
 
     return config 
-
-'''def model_fn_wrapper(FLAGS.tune_scope, FLAGS.train_device, FLAGS.learning_rate, FLAGS.decay_steps,
-                     FLAGS.decay_rate, FLAGS.decay_staircase, FLAGS.momentum, FLAGS.output, 
-                     FLAGS.max_num_steps):
-
-    train_fn = lambda : modelfn.model_fn
-    return train_fn'''
 
 def main(argv=None):
 
     custom_config = tf.estimator.RunConfig(session_config=_get_session_config(),
                                            save_checkpoints_secs=30)
-    flags = [FLAGS.output]
+    
     # Initialize the classifier
-    classifier = tf.estimator.Estimator(model_fn=model_fn._train_wrapper(
+    classifier = tf.estimator.Estimator(model_fn=model_fn.train_wrapper(
         FLAGS.tune_scope, FLAGS.tune_from, FLAGS.train_device, 
         FLAGS.learning_rate, FLAGS.decay_steps, FLAGS.decay_rate, 
         FLAGS.decay_staircase, FLAGS.momentum),

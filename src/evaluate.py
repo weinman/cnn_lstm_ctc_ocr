@@ -1,13 +1,29 @@
+# CNN-LSTM-CTC-OCR
+# Copyright (C) 2017 Jerod Weinman
+# Copyright (C) 2018 Abyaya Lamsal
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import tensorflow as tf
 from tensorflow.contrib.training.python.training import evaluation
-import model_fn
-import pipeline
 from tensorflow.python.estimator import util
 from tensorflow.python.data.ops import dataset_ops
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.estimator import model_fn as model_fn_lib
-import six
 from tensorflow.python.ops import control_flow_ops
+import six
+import model_fn
+import pipeline
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -100,7 +116,7 @@ def main(argv=None):
   features, labels = _get_input_stream()
 
   # Returns a evaluation function 
-  evaluate_fn = model_fn._evaluate_wrapper(FLAGS.device)
+  evaluate_fn = model_fn.evaluate_wrapper(FLAGS.device)
 
   # Wraps all the necessary ops in an Estimator spec object
   estimator_spec = evaluate_fn(features, labels, 
