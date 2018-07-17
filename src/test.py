@@ -25,7 +25,23 @@ import model_fn
 
 FLAGS = tf.app.flags.FLAGS
 
-optimizer = 'Adam'
+tf.app.flags.DEFINE_string('model','../data/model',
+                          """Directory for model checkpoints""")
+
+tf.app.flags.DEFINE_integer('batch_size',2**9,
+                            """Eval batch size""")
+tf.app.flags.DEFINE_string('device','/gpu:0',
+                          """Device for graph placement""")
+tf.app.flags.DEFINE_string('test_path','../data/',
+                           """Base directory for test/validation data""")
+tf.app.flags.DEFINE_string('filename_pattern','val/words-*',
+                           """File pattern for test input data""")
+tf.app.flags.DEFINE_integer('num_input_threads',4,
+                          """Number of readers for input data""")
+tf.app.flags.DEFINE_boolean('static_data', True,
+                            """Whether to use static data 
+                            (false for dynamic data)""")
+
 tf.logging.set_verbosity(tf.logging.WARN)
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -33,16 +49,16 @@ def _get_input_stream():
     if(FLAGS.static_data):
         ds = pipeline.get_static_data(FLAGS.test_path, 
                                       str.split(
-                                          FLAGS.filename_pattern_test,','),
-                                      num_threads=FLAGS.num_input_threads_eval,
+                                          FLAGS.filename_pattern,','),
+                                      num_threads=FLAGS.num_input_threads,
                                       boundaries=None, # No bucketing
-                                      batch_size=FLAGS.batch_size_eval,
+                                      batch_size=FLAGS.batch_size,
                                       input_device=FLAGS.device,
                                       filter_fn=None)
                                     
     else:
-        ds = pipeline.get_dynamic_data(num_threads=FLAGS.num_input_threads_eval,
-                                       batch_size=FLAGS.batch_size_eval,
+        ds = pipeline.get_dynamic_data(num_threads=FLAGS.num_input_threads,
+                                       batch_size=FLAGS.batch_size,
                                        boundaries=None, # No bucketing
                                        input_device=FLAGS.device,
                                        filter_fn=filters.dyn_filter_by_width)
@@ -75,7 +91,8 @@ def main(argv=None):
     custom_config = tf.estimator.RunConfig(session_config=_get_session_config())
 
     # Initialize the classifier
-    classifier = tf.estimator.Estimator(model_fn=model_fn.model_fn, 
+    classifier = tf.estimator.Estimator(model_fn=model_fn._evaluate_wrapper(
+        FLAGS.device), 
                                         model_dir=FLAGS.model,
                                         config=custom_config)
 
