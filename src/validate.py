@@ -39,11 +39,9 @@ tf.app.flags.DEFINE_string('lexicon','',
 
 tf.logging.set_verbosity(tf.logging.WARN)
 
-# Non-configurable parameters
-mode = learn.ModeKeys.INFER # 'Configure' training mode for dropout layers
-
-def _get_image(filename):
+def _get_image( filename ):
     """Load image data for placement in graph"""
+
     image = Image.open(filename) 
     image = np.array(image)
     # in mjsynth, all three channels are the same in these grayscale-cum-RGB data
@@ -52,7 +50,7 @@ def _get_image(filename):
     return image
 
 
-def _preprocess_image(image):
+def _preprocess_image( image ):
 
     # Copied from mjsynth.py. Should be abstracted to a more general module.
     
@@ -68,16 +66,23 @@ def _preprocess_image(image):
 
 
 def _get_input():
-    """Set up and return image and width placeholder tensors"""
+    """Create a dataset of images by reading from stdin"""
 
+    # Initializing the dataset with one image
+    image_data = _get_image(raw_input().rstrip())
+    dataset = tf.data.Dataset.from_tensors(image_data)
+
+    # Add the rest of the images to the dataset (if any)
     for line in sys.stdin:
         image_data = _get_image(line.rstrip())
-        features = {"image": image_data,
-                    "width": image_data.shape[1]}
-        yield features
+        temp_dataset = tf.data.Dataset.from_tensors(image_data)
+        dataset = dataset.concatenate(temp_dataset)
+    
+    # Iterate over the dataset to extract each image
+    iterator = dataset.make_one_shot_iterator()
+    image = iterator.get_next()
 
-    #return image,width
-
+    return image
 
 def _get_output(rnn_logits,sequence_length):
     """Create ops for validation
@@ -104,6 +109,7 @@ def _get_output(rnn_logits,sequence_length):
 
 def _get_session_config():
     """Setup session config to soften device placement"""
+
     config=tf.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False)
@@ -113,6 +119,7 @@ def _get_session_config():
 
 def _get_string(labels):
     """Transform an 1D array of labels into the corresponding character string"""
+
     string = ''.join([pipeline.out_charset[c] for c in labels])
     return string
 
@@ -122,13 +129,15 @@ def _get_dictionary_tensor(dictionary_path, charset):
 
 def model_fn(features, labels, mode):
 
-    feature = next(features)
-    image = feature['image']
-    width = feature['width']
-
+    # Get the appropriate tensors
+    image = features
+    width = tf.size(image[1])
+    
+    # Pre-process the images
     proc_image = _preprocess_image(image)
     proc_image = tf.reshape(proc_image,[1,32,-1,1]) # Make first dim batch
 
+    
     with tf.device(FLAGS.device):
         features,sequence_length = model.convnet_layers( proc_image, width, 
                                                          mode)
@@ -142,6 +151,7 @@ def model_fn(features, labels, mode):
 
         return tf.estimator.EstimatorSpec(mode=mode,predictions=(ret))
 
+
 def main(argv=None):
 
     custom_config = tf.estimator.RunConfig(session_config=_get_session_config())
@@ -152,45 +162,12 @@ def main(argv=None):
 
     predictions = classifier.predict(input_fn=lambda: _get_input())
 
-    #for item in predictions:
-     #   print _get_string(item)
 
     while True:
-         print(_get_string(next(predictions)))
-    #print _get_string((next(predictions)))
-
-    """with tf.Graph().as_default():
-        image,width = _get_input() # Placeholder tensors
-
-        proc_image = _preprocess_image(image)
-        proc_image = tf.reshape(proc_image,[1,32,-1,1]) # Make first dim batch
-
-        with tf.device(FLAGS.device):
-            features,sequence_length = model.convnet_layers( proc_image, width, 
-                                                             mode)
-            logits = model.rnn_layers( features, sequence_length,
-                                       pipeline.num_classes() )
-            prediction = _get_output( logits,sequence_length)
-
-        session_config = _get_session_config()
-        restore_model = _get_init_trained()
-        
-        init_op = tf.group( tf.global_variables_initializer(),
-                            tf.local_variables_initializer()) 
-
-        with tf.Session(config=session_config) as sess:
-            
-            sess.run(init_op)
-            restore_model(sess, _get_checkpoint()) # Get latest checkpoint
-
-            # Iterate over filenames given on lines of standard input
-            for line in sys.stdin:
-                # Eliminate any trailing newline from filename
-                image_data = _get_image(line.rstrip())
-                # Get prediction for single image (isa SparseTensorValue)
-                [output] = sess.run(prediction,{ image: image_data, 
-                                                 width: image_data.shape[1]} )
-                print(_get_string(output.values))"""
-
+        try:
+            print(_get_string(next(predictions)))
+        except:
+            sys.exit()
+    
 if __name__ == '__main__':
     tf.app.run()
