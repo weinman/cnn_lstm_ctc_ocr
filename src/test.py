@@ -1,6 +1,5 @@
 # CNN-LSTM-CTC-OCR
-# Copyright (C) 2017 Jerod Weinman
-#
+# Copyright (C) 2017,2018 Jerod Weinman, Abyaya Lamsal, Benjamin Gafford
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -42,8 +41,8 @@ tf.app.flags.DEFINE_boolean( 'static_data', True,
                             """Whether to use static data 
                             (false for dynamic data)""" )
 
-tf.logging.set_verbosity( tf.logging.WARN )
-tf.logging.set_verbosity( tf.logging.INFO )
+#tf.logging.set_verbosity( tf.logging.WARN )
+#tf.logging.set_verbosity( tf.logging.INFO )
 
 def _get_input_stream():
     if( FLAGS.static_data ):
@@ -78,26 +77,28 @@ def _get_input_stream():
 
     return features, label
 
-def _get_session_config():
-    """Setup session config to soften device placement"""
-    config=tf.ConfigProto(
+def _get_config():
+    """Setup config to soften device placement and set chkpt saving intervals"""
+
+    device_config=tf.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False )
 
-    return config
+    custom_config = tf.estimator.RunConfig(session_config=device_config)
+
+    return custom_config
 
 
 def main(argv=None):
-    custom_config = tf.estimator.RunConfig( session_config=
-                                            _get_session_config() )
+  
 
     # Initialize the classifier
-    classifier = tf.estimator.Estimator( model_fn=model_fn.evaluate_wrapper(
-        FLAGS.device ), 
-                                         model_dir=FLAGS.model,
-                                         config=custom_config )
+    classifier = tf.estimator.Estimator( config = _get_config(),
+                                         model_fn=model_fn.evaluate_fn(
+                                             FLAGS.device ), 
+                                         model_dir=FLAGS.model)
 
-    evaluations = classifier.evaluate( input_fn=lambda: _get_input_stream() )
+    evaluations = classifier.evaluate( input_fn=_get_input_stream)
     print(evaluations)
 
 if __name__ == '__main__':

@@ -15,11 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import tensorflow as tf
-from tensorflow.contrib.training.python.training import evaluation
-from tensorflow.python.estimator import util
-from tensorflow.python.data.ops import dataset_ops
-from tensorflow.python.platform import tf_logging as logging
-from tensorflow.python.estimator import model_fn as model_fn_lib
 from tensorflow.python.ops import control_flow_ops
 import six
 import model_fn
@@ -31,7 +26,7 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer( 'batch_size',2**9,
                              """Eval batch size""" )
 tf.app.flags.DEFINE_integer('eval_interval_secs', 60,
-                             'Time between test runs')
+                             """Time between test runs""")
 
 tf.app.flags.DEFINE_string( 'device','/gpu:0',
                             """Device for graph placement""" )
@@ -116,24 +111,24 @@ def main(argv=None):
   features, labels = _get_input_stream()
 
   # Returns a evaluation function 
-  evaluate_fn = model_fn.evaluate_wrapper(FLAGS.device)
+  evaluate_fn = model_fn.evaluate_fn(FLAGS.device)
 
   # Wraps all the necessary ops in an Estimator spec object
   estimator_spec = evaluate_fn(features, labels, 
                                tf.estimator.ModeKeys.EVAL)
 
   # Extracts the necessary ops and the final tensors from the estimator spec
-  update_op, eval_dict = _extract_metric_update_ops(
+  update_op, value_ops = _extract_metric_update_ops(
     estimator_spec.eval_metric_ops)
   
   # Hook responsible for evaluating X number of batches (in this case it is 1)
-  hooks = tf.contrib.training.StopAfterNEvalsHook( 1 )
+  stop_hook = tf.contrib.training.StopAfterNEvalsHook( 1 )
 
   # Evaluates repeatedly once a new checkpoint is found
   tf.contrib.training.evaluate_repeatedly(
-    checkpoint_dir=FLAGS.model,eval_ops=update_op, final_ops=eval_dict, 
-    hooks = [hooks], config=_get_session_config( ), 
-    eval_interval_secs= eval_interval_secs )
+    checkpoint_dir=FLAGS.model,eval_ops=update_op, final_ops=value_ops, 
+      hooks = [stop_hook], config=_get_session_config(), 
+      eval_interval_secs= FLAGS.eval_interval_secs )
   
   
 if __name__ == '__main__':

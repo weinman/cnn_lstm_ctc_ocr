@@ -1,5 +1,5 @@
 # CNN-LSTM-CTC-OCR
-# Copyright (C) 2017 Jerod Weinman
+# Copyright (C) 2017,2018 Jerod Weinman, Abyaya Lamsal, Benjamin Gafford
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -51,6 +51,8 @@ tf.app.flags.DEFINE_integer('max_num_steps', 2**21,
 tf.app.flags.DEFINE_boolean('static_data', True,
                             """Whether to use static data 
                             (false for dynamic data)""")
+tf.app.flags.DEFINE_integer('save_checkpoint_secs', 30,
+                            """Interval between daving checkpoints""")
 
 tf.app.flags.DEFINE_string('train_device','/gpu:1',
                            """Device for training graph placement""")
@@ -100,35 +102,44 @@ def _get_input_stream():
     #tf.summary.image('images',image) # Uncomment to see images in TensorBoard
 
     # The input for the model function 
-    features = {"image": image, "width": width, "optimizer": optimizer}
+    features = {"image": image, "width": width}
     
     return features, label
 
-def _get_session_config():
-    """Setup session config to soften device placement"""
+def _get_config():
+    """Setup config to soften device placement and set chkpt saving intervals"""
 
-    config=tf.ConfigProto(
+    device_config=tf.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False)
 
-    return config 
+    custom_config = tf.estimator.RunConfig(session_config=device_config,
+                                           save_checkpoints_secs=
+                                           FLAGS.save_checkpoint_secs)
+
+    return custom_config 
 
 def main(argv=None):
 
-    custom_config = tf.estimator.RunConfig(session_config=_get_session_config(),
-                                           save_checkpoints_secs=30)
-    
-    # Initialize the classifier
-    classifier = tf.estimator.Estimator(model_fn=model_fn.train_wrapper(
-        FLAGS.tune_scope, FLAGS.tune_from, FLAGS.train_device, 
-        FLAGS.learning_rate, FLAGS.decay_steps, FLAGS.decay_rate, 
-        FLAGS.decay_staircase, FLAGS.momentum),
-                                        model_dir=FLAGS.output,
-                                        config=custom_config)
+    # Set up a dictionary of arguments to be passed for training
+    train_args = {'scope': FLAGS.tune_scope, 
+                  'tune_from': FLAGS.tune_from, 
+                  'train_device': FLAGS.train_device, 
+                  'learning_rate': FLAGS.learning_rate, 
+                  'decay_steps': FLAGS.decay_steps, 
+                  'decay_rate': FLAGS.decay_rate, 
+                  'decay_staircase': FLAGS.decay_staircase, 
+                  'momentum':FLAGS.momentum}
 
+    # Initialize the classifier
+    classifier = tf.estimator.Estimator( config=_get_config(), 
+                                         model_fn=model_fn.train_fn(
+                                             **train_args),
+                                         model_dir=FLAGS.output )
+   
     # Train the model
-    classifier.train(input_fn=lambda: _get_input_stream(), 
-                     max_steps=FLAGS.max_num_steps)
+    classifier.train( input_fn=_get_input_stream, 
+                      max_steps=FLAGS.max_num_steps )
 
 if __name__ == '__main__':
     tf.app.run()

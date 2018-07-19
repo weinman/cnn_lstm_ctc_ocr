@@ -135,7 +135,7 @@ def _parse_function(data):
 
     return image,width,label,length,text,filename
 
-def _preprocess_image(image):
+def preprocess_image(image):
     # Rescale from uint8([0,255]) to float([-0.5,0.5])
     image = tf.image.convert_image_dtype(image, tf.float32)
     image = tf.subtract(image, 0.5)
