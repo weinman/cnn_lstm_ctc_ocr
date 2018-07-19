@@ -1,5 +1,5 @@
 # CNN-LSTM-CTC-OCR
-# Copyright (C) 2017 Jerod Weinman
+# Copyright (C) 2017,2018 Jerod Weinman, Abyaya Lamsal, Benjamin Gafford
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,6 +25,51 @@ import model_fn
 import filters
 
 FLAGS = tf.app.flags.FLAGS
+
+tf.app.flags.DEFINE_string('output','../data/model',
+                          """Directory for event logs and checkpoints""")
+tf.app.flags.DEFINE_string('tune_from','',
+                          """Path to pre-trained model checkpoint""")
+tf.app.flags.DEFINE_string('tune_scope','',
+                          """Variable scope for training""")
+
+tf.app.flags.DEFINE_integer('batch_size',2**5,
+                            """Mini-batch size""")
+tf.app.flags.DEFINE_float('learning_rate',1e-4,
+                          """Initial learning rate""")
+tf.app.flags.DEFINE_float('momentum',0.9,
+                          """Optimizer gradient first-order momentum""")
+tf.app.flags.DEFINE_float('decay_rate',0.9,
+                          """Learning rate decay base""")
+tf.app.flags.DEFINE_float('decay_steps',2**16,
+                          """Learning rate decay exponent scale""")
+tf.app.flags.DEFINE_boolean('decay_staircase',False,
+                          """Staircase learning rate decay by integer division""")
+
+
+tf.app.flags.DEFINE_integer('max_num_steps', 2**21,
+                            """Number of optimization steps to run""")
+tf.app.flags.DEFINE_boolean('static_data', True,
+                            """Whether to use static data 
+                            (false for dynamic data)""")
+tf.app.flags.DEFINE_integer('save_checkpoint_secs', 30,
+                            """Interval between daving checkpoints""")
+
+tf.app.flags.DEFINE_string('train_device','/gpu:1',
+                           """Device for training graph placement""")
+tf.app.flags.DEFINE_string('input_device','/gpu:0',
+                           """Device for preprocess/batching graph placement""")
+
+tf.app.flags.DEFINE_string('train_path','../data/train/',
+                           """Base directory for training data""")
+tf.app.flags.DEFINE_string('filename_pattern','words-*',
+                           """File pattern for input data""")
+tf.app.flags.DEFINE_integer('num_input_threads',4,
+                          """Number of readers for input data""")
+tf.app.flags.DEFINE_integer('width_threshold',None,
+                            """Limit of input image width""")
+tf.app.flags.DEFINE_integer('length_threshold',None,
+                            """Limit of input string length width""")
 
 # For displaying various statistics while training
 tf.logging.set_verbosity( tf.logging.INFO )
@@ -55,27 +100,45 @@ def _input_fn():
                                  input_device=FLAGS.input_device,
                                  filter_fn=filter_fn )
     return dataset
+tf.logging.set_verbosity(tf.logging.INFO)
 
-def _get_session_config():
-    """Setup session config to soften device placement"""
+# Non-configurable parameters
+optimizer='Adam'
 
-    config=tf.ConfigProto( allow_soft_placement=True, 
-                           log_device_placement=False )
 
-    return config 
+def _get_config():
+    """Setup config to soften device placement and set chkpt saving intervals"""
+
+    device_config=tf.ConfigProto(
+        allow_soft_placement=True, 
+        log_device_placement=False)
+
+    custom_config = tf.estimator.RunConfig(session_config=device_config,
+                                           save_checkpoints_secs=
+                                           FLAGS.save_checkpoint_secs)
+
+    return custom_config 
 
 def main( argv=None ):
 
-    custom_config = tf.estimator.RunConfig( 
-        session_config=_get_session_config(),
-        save_checkpoints_secs=30 )
-    
-    # Initialize the classifier
-    classifier = tf.estimator.Estimator( model_fn=model_fn.model_fn, 
-                                         model_dir=FLAGS.train_output,
-                                         config=custom_config )
+    # Set up a dictionary of arguments to be passed for training
+    train_args = {'scope': FLAGS.tune_scope, 
+                  'tune_from': FLAGS.tune_from, 
+                  'train_device': FLAGS.train_device, 
+                  'learning_rate': FLAGS.learning_rate, 
+                  'decay_steps': FLAGS.decay_steps, 
+                  'decay_rate': FLAGS.decay_rate, 
+                  'decay_staircase': FLAGS.decay_staircase, 
+                  'momentum':FLAGS.momentum}
 
+    # Initialize the classifier
+    classifier = tf.estimator.Estimator( config=_get_config(), 
+                                         model_fn=model_fn.train_fn(
+                                             **train_args),
+                                         model_dir=FLAGS.output )
+   
     # Train the model
+<<<<<<< HEAD
     classifier.train( input_fn=_input_fn, max_steps=FLAGS.max_num_steps )
 
 if __name__ == '__main__':

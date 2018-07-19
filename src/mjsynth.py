@@ -103,9 +103,11 @@ def _get_filenames( base_dir, file_patterns=['*.tfrecord'] ):
 
     return data_files
 
-def _preprocess_image( image ):
+def preprocess_image( image ):
     """Preprocess image: Rescale and fix image height"""
+
     image = pipeline.rescale_image( image )
+    # Rescale from uint8([0,255]) to float([-0.5,0.5])
 
     # Pad with copy of first row to expand to 32 pixels height
     first_row = tf.slice( image, [0, 0, 0], [1, -1, -1] )

@@ -1,5 +1,5 @@
 # CNN-LSTM-CTC-OCR
-# Copyright (C) 2017 Jerod Weinman
+# Copyright (C) 2017,2018 Jerod Weinman, Abyaya Lamsal, Benjamin Gafford
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,6 +24,22 @@ import filters
 import model_fn
 
 FLAGS = tf.app.flags.FLAGS
+
+tf.app.flags.DEFINE_string( 'model','../data/model',
+                            """Directory for model checkpoints""" )
+
+tf.app.flags.DEFINE_integer( 'batch_size',2**9,
+                             """Eval batch size""" )
+tf.app.flags.DEFINE_string( 'device','/gpu:0',
+                            """Device for graph placement""" )
+tf.app.flags.DEFINE_string( 'test_path','../data/',
+                            """Base directory for test/validation data""" )
+
+
+
+
+
+
 
 tf.logging.set_verbosity( tf.logging.WARN )
 
@@ -53,27 +69,35 @@ def _input_fn():
                                  filter_fn=filter_fn )
     return dataset
 
-def _get_session_config():
-    """Setup session config to soften device placement"""
-    config=tf.ConfigProto( allow_soft_placement=True, 
-                           log_device_placement=False )
 
-    return config
 
-def main( argv=None ):
-    custom_config = tf.estimator.RunConfig( 
-        session_config=_get_session_config() )
+tf.app.flags.DEFINE_string( 'filename_pattern','val/words-*',
+                            """File pattern for test input data""" )
+tf.app.flags.DEFINE_integer( 'num_input_threads',4,
+                             """Number of readers for input data""" )
+tf.app.flags.DEFINE_boolean( 'static_data', True,
+                            """Whether to use static data 
+                            (false for dynamic data)""" )
+
+    device_config=tf.ConfigProto(
+        allow_soft_placement=True, 
+        log_device_placement=False )
+
+    custom_config = tf.estimator.RunConfig(session_config=device_config)
+
+    return custom_config
+
+
+def main(argv=None):
+  
 
     # Initialize the classifier
-    classifier = tf.estimator.Estimator( model_fn=model_fn.model_fn, 
-                                         model_dir=FLAGS.model,
-                                         config=custom_config )
-    
-    while True:
-        # NOTE: steps=1 is here so that unterminated data streams work
-        # This should be changed once batch-level results are figured out
-        evaluations = classifier.evaluate( input_fn=_input_fn, steps=100 )
-        print( evaluations )
+    classifier = tf.estimator.Estimator( config = _get_config(),
+                                         model_fn=model_fn.evaluate_fn(
+                                             FLAGS.device ), 
+                                         model_dir=FLAGS.model)
 
+    evaluations = classifier.evaluate( input_fn=_get_input_stream)
+    print(evaluations)
 if __name__ == '__main__':
     tf.app.run()
