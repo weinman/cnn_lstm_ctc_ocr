@@ -1,5 +1,5 @@
 # CNN-LSTM-CTC-OCR
-# Copyright (C) 2017 Jerod Weinman
+# Copyright (C) 2017,2018 Jerod Weinman, Abyaya Lamsal, Benjamin Gafford
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -69,7 +69,7 @@ def preprocess_fn( data ):
     text = features['text/string']
     filename = features['image/filename']
 
-    image = _preprocess_image( image )
+    image = preprocess_image( image )
 
     return image, width, label, length, text, filename
 

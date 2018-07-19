@@ -16,8 +16,6 @@
 
 import os
 import tensorflow as tf
-from tensorflow.contrib import learn
-
 import pipeline
 import charset
 import model
@@ -74,7 +72,11 @@ tf.app.flags.DEFINE_integer('length_threshold',None,
 # For displaying various statistics while training
 tf.logging.set_verbosity( tf.logging.INFO )
 
-def _input_fn():
+# Non-configurable parameters
+#optimizer='Adam'
+
+
+def _get_input():
     """
     Get dataset according to tf flags for training using Estimator
     Note: Default behavior is bucketing according to default bucket boundaries
@@ -93,17 +95,13 @@ def _input_fn():
     dataset = pipeline.get_data( FLAGS.static_data,
                                  base_dir=FLAGS.train_path,
                                  file_patterns=str.split(
-                                     FLAGS.filename_pattern_train,
+                                     FLAGS.filename_pattern,
                                      ','),
-                                 num_threads=FLAGS.num_input_threads_train,
-                                 batch_size=FLAGS.batch_size_train,
+                                 num_threads=FLAGS.num_input_threads,
+                                 batch_size=FLAGS.batch_size,
                                  input_device=FLAGS.input_device,
                                  filter_fn=filter_fn )
     return dataset
-tf.logging.set_verbosity(tf.logging.INFO)
-
-# Non-configurable parameters
-optimizer='Adam'
 
 
 def _get_config():
@@ -118,6 +116,7 @@ def _get_config():
                                            FLAGS.save_checkpoint_secs)
 
     return custom_config 
+
 
 def main( argv=None ):
 
@@ -138,8 +137,7 @@ def main( argv=None ):
                                          model_dir=FLAGS.output )
    
     # Train the model
-<<<<<<< HEAD
-    classifier.train( input_fn=_input_fn, max_steps=FLAGS.max_num_steps )
+    classifier.train( input_fn=_get_input, max_steps=FLAGS.max_num_steps )
 
 if __name__ == '__main__':
     tf.app.run()

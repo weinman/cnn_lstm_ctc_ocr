@@ -35,15 +35,18 @@ tf.app.flags.DEFINE_string( 'device','/gpu:0',
 tf.app.flags.DEFINE_string( 'test_path','../data/',
                             """Base directory for test/validation data""" )
 
+tf.app.flags.DEFINE_string( 'filename_pattern','val/words-*',
+                            """File pattern for test input data""" )
+tf.app.flags.DEFINE_integer( 'num_input_threads',4,
+                             """Number of readers for input data""" )
+tf.app.flags.DEFINE_boolean( 'static_data', True,
+                            """Whether to use static data 
+                            (false for dynamic data)""" )
 
+#tf.logging.set_verbosity( tf.logging.WARN )
+tf.logging.set_verbosity( tf.logging.INFO )
 
-
-
-
-
-tf.logging.set_verbosity( tf.logging.WARN )
-
-def _input_fn():
+def _get_input():
     """
     Get dataset according to tf flags for testing using Estimator
     Returns:
@@ -58,26 +61,19 @@ def _input_fn():
 
     # Get data according to flags
     dataset = pipeline.get_data( FLAGS.static_data,
-                                 base_dir=FLAGS.eval_path,
+                                 base_dir=FLAGS.test_path,
                                  file_patterns=str.split(
-                                     FLAGS.filename_pattern_eval,
+                                     FLAGS.filename_pattern,
                                      ','),
-                                 num_threads=FLAGS.num_input_threads_eval,
-                                 batch_size=FLAGS.batch_size_eval,
-                                 bucket_boundaries=None,
-                                 input_device=FLAGS.input_device,
+                                 num_threads=FLAGS.num_input_threads,
+                                 batch_size=FLAGS.batch_size,
+                                 input_device=FLAGS.device,
                                  filter_fn=filter_fn )
     return dataset
 
 
-
-tf.app.flags.DEFINE_string( 'filename_pattern','val/words-*',
-                            """File pattern for test input data""" )
-tf.app.flags.DEFINE_integer( 'num_input_threads',4,
-                             """Number of readers for input data""" )
-tf.app.flags.DEFINE_boolean( 'static_data', True,
-                            """Whether to use static data 
-                            (false for dynamic data)""" )
+def _get_config():
+    """Setup config to soften device placement"""
 
     device_config=tf.ConfigProto(
         allow_soft_placement=True, 
@@ -90,14 +86,16 @@ tf.app.flags.DEFINE_boolean( 'static_data', True,
 
 def main(argv=None):
   
-
     # Initialize the classifier
     classifier = tf.estimator.Estimator( config = _get_config(),
                                          model_fn=model_fn.evaluate_fn(
                                              FLAGS.device ), 
-                                         model_dir=FLAGS.model)
-
-    evaluations = classifier.evaluate( input_fn=_get_input_stream)
+                                         model_dir=FLAGS.model,
+                                         params={'continuous_eval': False} )
+    
+    evaluations = classifier.evaluate( input_fn=_get_input )
+    
     print(evaluations)
+
 if __name__ == '__main__':
     tf.app.run()

@@ -1,6 +1,6 @@
 # CNN-LSTM-CTC-OCR
-# Copyright (C) 2017 Jerod Weinman
-# Copyright (C) 2018 Abyaya Lamsal
+# Copyright (C) 2017,2018 Jerod Weinman, Abyaya Lamsal, Benjamin Gafford
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -44,38 +44,35 @@ tf.app.flags.DEFINE_boolean( 'static_data', True,
                              (false for dynamic data)""" )
 
 tf.logging.set_verbosity( tf.logging.WARN )
-tf.logging.set_verbosity( tf.logging.INFO )
+#tf.logging.set_verbosity( tf.logging.INFO )
 
-def _get_input_stream():
-    if(FLAGS.static_data):
-        ds = pipeline.get_static_data(FLAGS.test_path, 
-                                      str.split(
-                                        FLAGS.filename_pattern,','),
-                                      num_threads=FLAGS.num_input_threads,
-                                      boundaries=None, # No bucketing
-                                      batch_size=FLAGS.batch_size,
-                                      input_device=FLAGS.device,
-                                      filter_fn=None)
-                                    
-    else:
-        ds = pipeline.get_dynamic_data(num_threads=FLAGS.num_input_threads_eval,
-                                       batch_size=FLAGS.batch_size_eval,
-                                       boundaries=None, # No bucketing
-                                       input_device=FLAGS.device,
-                                       filter_fn=filters.dyn_filter_by_width)
+def _get_input():
+    """
+    Get dataset according to tf flags for training using Estimator
+    Note: Default behavior is bucketing according to default bucket boundaries
+    listed in pipeline.get_data
+    Returns:
+      dataset : elements structured as [features, labels]
+                feature structure can be seen in postbatch_fn 
+                in mjsynth.py or maptextsynth.py for static or dynamic
+                data pipelines respectively
+    """
 
-    iterator = ds.make_one_shot_iterator() 
-    
-    image, width, label, length, _, _ = iterator.get_next()
+    # We only want a filter_fn if we have dynamic data (for now)
+    filter_fn = None if FLAGS.static_data else filters.dyn_filter_by_width
 
-    # The input for the model function 
-    features = {"image": image, 
-                "width": width, 
-                "length": length, 
-                "label": label,
-                "continuous_eval": True}
+    # Get data according to flags
+    dataset = pipeline.get_data( FLAGS.static_data,
+                                 base_dir=FLAGS.test_path,
+                                 file_patterns=str.split(
+                                     FLAGS.filename_pattern,
+                                     ','),
+                                 num_threads=FLAGS.num_input_threads,
+                                 batch_size=FLAGS.batch_size,
+                                 input_device=FLAGS.device,
+                                 filter_fn=filter_fn )
+    return dataset
 
-    return features, label
 
 # Taken from the official source code of Tensorflow
 # Licensed under the Apache License, Version 2.0
@@ -96,39 +93,47 @@ def _extract_metric_update_ops( eval_dict ):
 
   return update_op, value_ops
 
-def _get_session_config():
+def _get_config():
     """Setup session config to soften device placement"""
     config=tf.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False)
 
-    return config
+    custom_config = tf.estimator.RunConfig(session_config=device_config)
+
+    return custom_config
 
 
 def main(argv=None):
     
-  #Input for evaluate function
-  features, labels = _get_input_stream()
+    #Input for evaluate function
+    dataset = _get_input()
 
-  # Returns a evaluation function 
-  evaluate_fn = model_fn.evaluate_fn(FLAGS.device)
+    iterator = dataset.make_one_shot_iterator()
 
-  # Wraps all the necessary ops in an Estimator spec object
-  estimator_spec = evaluate_fn(features, labels, 
-                               tf.estimator.ModeKeys.EVAL)
+    # Transforming the input into proper format
+    features, labels = iterator.get_next()
 
-  # Extracts the necessary ops and the final tensors from the estimator spec
-  update_op, value_ops = _extract_metric_update_ops(
-    estimator_spec.eval_metric_ops)
+    # Returns a evaluation function 
+    evaluate_fn = model_fn.evaluate_fn(FLAGS.device)
+
+    # Wraps all the necessary ops in an Estimator spec object
+    estimator_spec = evaluate_fn(features, labels, 
+                                 tf.estimator.ModeKeys.EVAL, 
+                                 {'continuous_eval': True})
+
+    # Extracts the necessary ops and the final tensors from the estimator spec
+    update_op, value_ops = _extract_metric_update_ops(
+        estimator_spec.eval_metric_ops)
   
-  # Hook responsible for evaluating X number of batches (in this case it is 1)
-  stop_hook = tf.contrib.training.StopAfterNEvalsHook( 1 )
+    # Hook responsible for evaluating X number of batches (in this case it is 1)
+    stop_hook = tf.contrib.training.StopAfterNEvalsHook( 1 )
 
-  # Evaluates repeatedly once a new checkpoint is found
-  tf.contrib.training.evaluate_repeatedly(
-    checkpoint_dir=FLAGS.model,eval_ops=update_op, final_ops=value_ops, 
-      hooks = [stop_hook], config=_get_session_config(), 
-      eval_interval_secs= FLAGS.eval_interval_secs )
+    # Evaluates repeatedly once a new checkpoint is found
+    tf.contrib.training.evaluate_repeatedly(
+        checkpoint_dir=FLAGS.model,eval_ops=update_op, final_ops=value_ops, 
+        hooks = [stop_hook], config=_get_config(), 
+        eval_interval_secs= FLAGS.eval_interval_secs )
   
   
 if __name__ == '__main__':
