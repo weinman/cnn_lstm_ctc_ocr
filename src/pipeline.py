@@ -94,7 +94,7 @@ def get_data( static_data,
         
         # Repeat for num_epochs  
         if num_epochs and static_data:
-            dataset = dataset.repeat( num_epoch )
+            dataset = dataset.repeat( num_epochs )
         # Repeat indefinitely if no num_epochs is specified
         elif static_data:
             dataset = dataset.repeat()

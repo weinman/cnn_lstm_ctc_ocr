@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import sys
 
 import numpy as np
@@ -22,11 +21,9 @@ import numpy as np
 from PIL import Image
 
 import tensorflow as tf
-from tensorflow.contrib import learn
 
-import pipeline
-import model
 import model_fn
+import charset
 from lexicon import dictionary_from_file
 
 FLAGS = tf.app.flags.FLAGS
@@ -39,8 +36,7 @@ tf.app.flags.DEFINE_string( 'lexicon','',
 			    """File containing lexicon of image words""" )
 
 #tf.logging.set_verbosity( tf.logging.WARN )
-#tf.logging.set_verbosity( tf.logging.INFO )
-
+tf.logging.set_verbosity( tf.logging.INFO )
 
 def _get_image( filename ):
     """Load image data for placement in graph"""
@@ -68,11 +64,7 @@ def _get_input():
         temp_dataset = tf.data.Dataset.from_tensors( image_data )
         dataset = dataset.concatenate( temp_dataset )
     
-    # Iterate over the dataset to extract each image
-    iterator = dataset.make_one_shot_iterator()
-    image = iterator.get_next()
-
-    return image
+    return dataset
 
 
 def _get_config():
@@ -87,13 +79,6 @@ def _get_config():
     return custom_config
 
 
-def _get_string( labels ):
-    """Transform an 1D array of labels into the corresponding character string"""
-
-    string = ''.join( [pipeline.out_charset[c] for c in labels] )
-    return string
-
-
 def main(argv=None):
     
     classifier = tf.estimator.Estimator( config=_get_config(),
@@ -106,7 +91,7 @@ def main(argv=None):
     # Get all the predictions in string format
     while True:
         try:
-            print( _get_string( next( predictions )))
+            print( charset.label_to_string( next( predictions )))
         except:
             sys.exit()
     

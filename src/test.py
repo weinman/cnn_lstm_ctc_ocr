@@ -13,13 +13,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import os
-import time
-import tensorflow as tf
-from tensorflow.contrib import learn
 
+import tensorflow as tf
 import pipeline
-import model
 import filters
 import model_fn
 
@@ -44,7 +40,7 @@ tf.app.flags.DEFINE_boolean( 'static_data', True,
                             (false for dynamic data)""" )
 
 #tf.logging.set_verbosity( tf.logging.WARN )
-tf.logging.set_verbosity( tf.logging.INFO )
+#tf.logging.set_verbosity( tf.logging.INFO )
 
 def _get_input():
     """
@@ -68,7 +64,8 @@ def _get_input():
                                  num_threads=FLAGS.num_input_threads,
                                  batch_size=FLAGS.batch_size,
                                  input_device=FLAGS.device,
-                                 filter_fn=filter_fn )
+                                 filter_fn=filter_fn, 
+                                 num_epochs=1)
     return dataset
 
 

@@ -14,11 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import tensorflow as tf
 import pipeline
 import charset
-import model
 import model_fn
 import filters
 
@@ -71,10 +69,6 @@ tf.app.flags.DEFINE_integer('length_threshold',None,
 
 # For displaying various statistics while training
 tf.logging.set_verbosity( tf.logging.INFO )
-
-# Non-configurable parameters
-#optimizer='Adam'
-
 
 def _get_input():
     """

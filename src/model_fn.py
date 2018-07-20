@@ -103,8 +103,8 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
 def _get_testing( rnn_logits,sequence_length,label,label_length ):
     """Create ops for testing (all scalars): 
        loss: CTC loss function value, 
-       label_error:   edit distance on beam search max
-       sequence_error: sequence error rate
+       label_error:   batch level edit distance on beam search max
+       sequence_error: batch level sequence error rate
     """
 
     with tf.name_scope( "train" ):
@@ -220,8 +220,8 @@ def _get_output( rnn_logits,sequence_length, lexicon ):
     """
     with tf.name_scope("test"):
 	if lexicon:
-	    dict_tensor = _get_dictionary_tensor( FLAGS.lexicon, 
-                                                  pipeline.out_charset )
+	    dict_tensor = _get_dictionary_tensor( lexicon, 
+                                                  charset.out_charset )
 	    predictions,_ = tf.nn.ctc_beam_search_decoder_trie( rnn_logits,
                                                                 sequence_length,
                                                                 alphabet_size=
@@ -277,7 +277,6 @@ def evaluate_fn( device ):
             logits, sequence_length = _get_image_info( features, mode )
 
             continuous_eval = params['continuous_eval']
-            #label = labels#features['label']
             length = features['length']
             
             # Get the predictions
@@ -313,7 +312,8 @@ def evaluate_fn( device ):
                                                 mean_label_error,
                                                 mean_sequence_error] )
 
-                # Create summaries for the approprite metrics during continous eval
+                # Create summaries for the approprite metrics during continous 
+                #eval
                 tf.summary.scalar( 'loss', loss)
                 tf.summary.scalar( 'mean_label_error', mean_label_error)
                 tf.summary.scalar( 'mean_sequence_error', mean_sequence_error )

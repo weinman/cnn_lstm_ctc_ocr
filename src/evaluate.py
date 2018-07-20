@@ -95,13 +95,11 @@ def _extract_metric_update_ops( eval_dict ):
 
 def _get_config():
     """Setup session config to soften device placement"""
-    config=tf.ConfigProto(
+    device_config=tf.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False)
 
-    custom_config = tf.estimator.RunConfig(session_config=device_config)
-
-    return custom_config
+    return device_config
 
 
 def main(argv=None):
