@@ -20,10 +20,19 @@
 # you'll get a runtime error when this is encountered.
 out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
+
+"""
+Dict for constant time string->label conversion
+Attribution: https://stackoverflow.com/questions/36459969/python-convert-list-to-dictionary-with-indexes -- from user: Abhijit
+Produces a table of character->index mappings according to out_charset
 """ 
+out_charset_dict = { key: val for val, key in enumerate( out_charset ) }
+
+"""
 Dict for constant time label->string conversion
 Produces a table of index->string mappings according to out_charset
 """
+
 int_to_string_dict = dict(enumerate(out_charset))
 
 def num_classes():
