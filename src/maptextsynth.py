@@ -17,7 +17,7 @@
 import os
 import tensorflow as tf
 import numpy as np
-from map_generator import data_generator
+from data_synth import data_generator
 import pipeline
 import charset
 
@@ -30,7 +30,7 @@ def get_dataset( args=None ):
         _generator_wrapper, 
         (tf.string, tf.int32, tf.int32),   # Output Types
         (tf.TensorShape( [] ),             # Text shape
-         tf.TensorShape( (32, None, 3) ),  # Image shape
+         tf.TensorShape( (32, None, 1) ),  # Image shape
          tf.TensorShape( [None] )) )       # Labels shape
     
 def preprocess_fn( caption, image, labels ):
@@ -39,7 +39,7 @@ def preprocess_fn( caption, image, labels ):
     Intended to get data as formatted from get_dataset function.
     Parameters:
       caption : tf.string corresponding to text
-      image   : tf.int32 tensor of shape [32, ?, 3]
+      image   : tf.int32 tensor of shape [32, ?, 1]
       labels  : tf.int32 tensor of shape [?]
     Returns:
       image   : preprocessed image
@@ -118,8 +118,6 @@ def _generator_wrapper():
 
 def _preprocess_image( image ):
     """Convert image to grayscale and rescale"""
-    # Final image should be pre-grayed in opencv *before* generation
-    image = tf.image.rgb_to_grayscale( image ) 
     
     image = pipeline.rescale_image( image )
 
