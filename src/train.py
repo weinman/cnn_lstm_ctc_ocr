@@ -14,6 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# train.py -- Train all or only part of the model from scratch or an
+#   existing checkpoint.
+
 import tensorflow as tf
 import pipeline
 import charset
