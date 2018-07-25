@@ -14,6 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# evaluate.py -- Streams evaluation statistics (i.e., character error
+#   rate, sequence error rate) for a single batch whenever a new model
+#   checkpoint appears
+
 import tensorflow as tf
 from tensorflow.python.ops import control_flow_ops
 import six
@@ -48,11 +52,14 @@ tf.logging.set_verbosity( tf.logging.WARN )
 
 def _get_input():
     """
-    Get dataset according to tf flags for training using Estimator
+    Get tf.data.Dataset object according to command-line flags for evaluation
+    using tf.estimator.Estimator
+
     Note: Default behavior is bucketing according to default bucket boundaries
     listed in pipeline.get_data
+
     Returns:
-      dataset : elements structured as [features, labels]
+      features, labels
                 feature structure can be seen in postbatch_fn 
                 in mjsynth.py or maptextsynth.py for static or dynamic
                 data pipelines respectively
@@ -71,6 +78,7 @@ def _get_input():
                                  batch_size=FLAGS.batch_size,
                                  input_device=FLAGS.device,
                                  filter_fn=filter_fn )
+
     return dataset
 
 
@@ -93,6 +101,7 @@ def _extract_metric_update_ops( eval_dict ):
 
   return update_op, value_ops
 
+
 def _get_config():
     """Setup session config to soften device placement"""
     device_config=tf.ConfigProto(
@@ -104,30 +113,28 @@ def _get_config():
 
 def main(argv=None):
     
-    #Input for evaluate function
     dataset = _get_input()
 
+    # Extract input tensors for evaluation
     iterator = dataset.make_one_shot_iterator()
-
-    # Transforming the input into proper format
     features, labels = iterator.get_next()
 
-    # Returns a evaluation function 
+    # Construct the evaluation function 
     evaluate_fn = model_fn.evaluate_fn(FLAGS.device)
 
-    # Wraps all the necessary ops in an Estimator spec object
+    # Wrap the ops in an Estimator spec object
     estimator_spec = evaluate_fn(features, labels, 
                                  tf.estimator.ModeKeys.EVAL, 
                                  {'continuous_eval': True})
 
-    # Extracts the necessary ops and the final tensors from the estimator spec
+    # Extract the necessary ops and the final tensors from the estimator spec
     update_op, value_ops = _extract_metric_update_ops(
         estimator_spec.eval_metric_ops)
   
-    # Hook responsible for evaluating X number of batches (in this case it is 1)
+    # Specify to evaluate N number of batches (in this case N==1)
     stop_hook = tf.contrib.training.StopAfterNEvalsHook( 1 )
 
-    # Evaluates repeatedly once a new checkpoint is found
+    # Evaluate repeatedly once a new checkpoint is found
     tf.contrib.training.evaluate_repeatedly(
         checkpoint_dir=FLAGS.model,eval_ops=update_op, final_ops=value_ops, 
         hooks = [stop_hook], config=_get_config(), 
