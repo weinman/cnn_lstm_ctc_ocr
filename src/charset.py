@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# charset.py -- A suite of tools for converting strings to/from labels
+
 
 # The list (well, string) of valid output characters
 # If any example contains a character not found here, 
@@ -23,16 +25,16 @@ out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 """
 Dict for constant time string->label conversion
-Attribution: https://stackoverflow.com/questions/36459969/python-convert-list-to-dictionary-with-indexes -- from user: Abhijit
+Attribution: https://stackoverflow.com/a/36460020 [Abhijit] Terms: CC-BY-SA
 Produces a table of character->index mappings according to out_charset
 """ 
 out_charset_dict = { key: val for val, key in enumerate( out_charset ) }
+
 
 """
 Dict for constant time label->string conversion
 Produces a table of index->string mappings according to out_charset
 """
-
 int_to_string_dict = dict(enumerate(out_charset))
 
 def num_classes():

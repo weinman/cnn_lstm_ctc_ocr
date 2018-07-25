@@ -14,6 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# model.py -- Constructs the graph representing the network
+#   model. Inputs start from convnet_layers(), whose outputs hook into
+#   rnn_layers(), which produces the logits for CTC loss (for
+#   training) and decoding (for prediction/evaluation).
+
 import tensorflow as tf
 from tensorflow.contrib import learn
 
@@ -57,6 +62,7 @@ def conv_layer( bottom, params, training ):
 
     return top
 
+
 def pool_layer( bottom, wpool, padding, name ):
     """Short function to build a pooling layer with less syntax"""
     top = tf.layers.max_pooling2d( bottom, 
@@ -65,6 +71,7 @@ def pool_layer( bottom, wpool, padding, name ):
                                    padding=padding, 
                                    name=name )
     return top
+
 
 def norm_layer( bottom, training, name):
     """Short function to build a batch normalization layer with less syntax"""
@@ -109,6 +116,7 @@ def convnet_layers( inputs, widths, mode ):
 
         return features, sequence_length
 
+
 def get_sequence_lengths( widths ):    
     """Calculate resulting sequence length from original image widths"""
     kernel_sizes = [params[1] for params in layer_params]
@@ -124,6 +132,7 @@ def get_sequence_lengths( widths ):
     after_pool6 = tf.subtract( after_pool4, one ) 
     after_pool8 = after_pool6
     return after_pool8
+
 
 def rnn_layer( bottom_sequence, sequence_length, rnn_size, scope ):
     """Build bidirectional (concatenated output) RNN layer"""

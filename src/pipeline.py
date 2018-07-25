@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# pipeline.py -- Constructs Dataset objects for use in training, testing, etc.
+
 import tensorflow as tf
 import numpy as np
 
@@ -26,7 +28,7 @@ def get_data( static_data,
               input_device=None,
               num_epochs=None,
               filter_fn=None ):
-    """Get dataset according to parameters
+    """Get Dataset according to parameters
     Parameters:
       static_data   : boolean for whether to use static or dynamic data
       base_dir      : string for static data locations (static data only)
@@ -107,6 +109,7 @@ def get_data( static_data,
         dataset = dataset.prefetch( num_buffered_elements )
         
     return dataset
+
 
 def rescale_image( image ):
     """Rescale from uint8([0,255]) to float([-0.5,0.5])"""
