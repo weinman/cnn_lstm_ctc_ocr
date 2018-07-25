@@ -3,6 +3,8 @@ import ctypes as c
 import cv2
 import time
 
+NUM_PRODUCERS = 4
+
 def get_lib():
     lib = c.cdll.LoadLibrary('./maptextsynth_deps/libmtsi.so')
 
@@ -30,8 +32,8 @@ def get_lib():
     lib.get_img_data.argtypes = [c.c_void_p]
     lib.get_img_data.restype = c.c_void_p
 
-    # in: void, out: void
-    lib.mts_init.argtypes = []
+    # in: int (num_producers), out: void
+    lib.mts_init.argtypes = [c.c_int]
     lib.mts_init.restype = None
 
     # in: void, out: void
@@ -40,43 +42,73 @@ def get_lib():
 
     return lib
 
-
-def data_generator():
+def format_sample(lib, ptr):
     # For c array -> numpy conversion
     buffer_from_memory = c.pythonapi.PyBuffer_FromMemory
     buffer_from_memory.restype = c.py_object
     
-    lib = get_lib()
-    lib.mts_init()
-    while True:
+    if not ptr:
+        print "No sample produced."
+        exit()
+    height = lib.get_height(ptr)
+    raw_data = lib.get_img_data(ptr)
+    caption = lib.get_caption(ptr)
+    width = lib.get_width(ptr)
+    raw_data_ptr = c.cast(raw_data, c.POINTER(c.c_ubyte))
+    # https://stackoverflow.com/questions/4355524/getting-data-from-ctypes-array-into-numpy
+    # Above link used as reference for c array -> numpy conversion
+    buffer = buffer_from_memory(raw_data_ptr, width*height)
+    img_flat = np.frombuffer(buffer, np.uint8)
+
+    img_shaped = np.reshape(img_flat, (height, width, 1))
+    return (caption, img_shaped)
+
+data_buff_size = 1000
+data_buff = []
+keep_consuming = True
+
+def get_data(lib):
+    
+    lib.mts_init(NUM_PRODUCERS)
+
+    while(len(data_buff) < data_buff_size):
         ptr = lib.get_sample()
         if not ptr:
             print "No sample produced."
             exit()
-        height = lib.get_height(ptr)
-        raw_data = lib.get_img_data(ptr)
-        caption = lib.get_caption(ptr)
-        width = lib.get_width(ptr)
-        raw_data_ptr = c.cast(raw_data, c.POINTER(c.c_ubyte))
-        # https://stackoverflow.com/questions/4355524/getting-data-from-ctypes-array-into-numpy
-        # Above link used as reference for c array -> numpy conversion
-        buffer = buffer_from_memory(raw_data_ptr, width*height)
-        img_flat = np.frombuffer(buffer, np.uint8)
-
-        img_shaped = np.reshape(img_flat, (height, width, 1))
+        (caption, image) = format_sample(lib, ptr)
+        data_buff.append((caption, image, ptr))
         
-        yield caption, img_shaped
+def data_generator():
+    lib = get_lib()
+
+    while True:
+        if(len(data_buff) < 2**7):
+            get_data(lib)
+        data = data_buff.pop()
+        (caption, image, ptr) = data
+        yield caption, image
         lib.free_sample(ptr)
+    
     # Note: I don't know how to get this called (mts_cleanup)
     lib.mts_cleanup()
 
-def gather_data(num_values):
+def gather_data(num_values, show_images, log_time):
     # Note: this is like this because data_generator used to take a lib as arg
     lib = get_lib()
-    lib.mts_init()
+    lib.mts_init(NUM_PRODUCERS)
+    
+    if log_time:
+        start_time = time.time()
     iter = data_generator() 
+
     for _ in range(num_values):
         caption, image = next(iter)
-        cv2.imshow("windows", image)
-        cv2.waitKey(0)
+        if show_images:
+            cv2.imshow(caption, image)
+            cv2.waitKey(0)
     lib.mts_cleanup()
+    if log_time:
+        end_time = time.time()
+        print "Time: ", end_time-start_time
+

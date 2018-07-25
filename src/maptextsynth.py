@@ -124,8 +124,8 @@ def _generator_wrapper():
 
 
 def _preprocess_image( image ):
-    """Convert image to grayscale and rescale"""
-    
+    """Rescale image"""
+
     image = pipeline.rescale_image( image )
 
     return image

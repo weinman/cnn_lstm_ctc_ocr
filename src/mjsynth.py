@@ -59,8 +59,8 @@ def get_dataset( args ):
     dataset = tf.data.TFRecordDataset( ds_filenames, 
                                        num_parallel_reads=num_threads,
                                        buffer_size=capacity )
+    return dataset
 
-    return dataset.prefetch( buffer_sz )
 
 def preprocess_fn( data ):
     """Parse the elements of the dataset"""
