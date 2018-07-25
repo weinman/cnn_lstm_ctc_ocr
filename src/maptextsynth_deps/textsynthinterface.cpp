@@ -10,11 +10,7 @@
 #include <signal.h>
 
 // Num elements to hold in g_data_pool queue
-#define BUFFER_SIZE 100
-#define NUM_PRODUCERS 4
-
-// producer threads keep producing while nonzero
-int g_keep_producing = 1;
+#define BUFFER_SIZE 5000
 
 // Contains all of the raw data of a sample
 typedef struct sample {
@@ -30,7 +26,7 @@ extern "C" {
   size_t get_height(void* ptr);
   size_t get_width(void* ptr);
   char* get_caption(void* ptr);
-  void mts_init(void);
+  void mts_init(int num_producers);
   void* get_sample(void);
   void free_sample(void* ptr);
   void mts_cleanup(void);
@@ -63,6 +59,12 @@ boost::lockfree::queue<sample_t*> g_data_pool(BUFFER_SIZE);
 // Maintain producer threads
 std::vector<std::thread> g_producer_threads;
 
+// producer threads keep producing while nonzero
+int g_keep_producing = 1;
+
+pthread_cond_t condvar = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+
 /* Get lexicon from a given file -- Will later be internal to MTS*/
 void read_words(string path, vector<String> &caps){
   ifstream infile(path);
@@ -77,7 +79,7 @@ void prepare_synthesis(cv::Ptr<MapTextSynthesizer> s) {
   vector<String> caps;
 
   //TODO fix this
-  read_words("/home/gaffordb/new_mts/MapTextSynthesizer/samples/IA/Civil.txt",caps);
+  read_words("/home/gaffordb/new_mega_merge/cnn_lstm_ctc_ocr/src/maptextsynth_deps/IA/Civil_clean.txt",caps);
   
   vector<String> blocky;
   blocky.push_back("MathJax_Fraktur");
@@ -91,7 +93,7 @@ void prepare_synthesis(cv::Ptr<MapTextSynthesizer> s) {
   vector<String> cursive;
   cursive.push_back("URW Chancery L");
 
-  //s->setSampleCaptions(caps);
+  s->setSampleCaptions(caps);
   s->setBlockyFonts(blocky);
   s->setRegularFonts(regular);
   s->setCursiveFonts(cursive);
@@ -132,21 +134,23 @@ void synthesize_data(shared_ptr<unordered_map<string, double> > params) {
       perror("failed to allocate memory for caption!\n");
     }
 
-    /* If queue is full, maybe sleep a little bit??
-     * Note: cv would probably be more appropriate here 
-     */
-    while(!g_data_pool.push(spl)) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    
+    while(!g_data_pool.bounded_push(spl) && g_keep_producing) {
+      /* If queue is full, maybe sleep a little bit??
+       * Note: cv would probably be more appropriate here 
+       */
+      //printf("Sleeping for 80 seconds.\n");
+      std::this_thread::sleep_for(std::chrono::seconds(2));
     }
   }
 }
   
 /* Run all of the threads for producing*/
-void run_producers(void) {
+void run_producers(int num_producers) {
 
   MTS_Utilities utils = MTS_Utilities();
 
-  for(int i = 0; i < NUM_PRODUCERS; i++) {
+  for(int i = 0; i < num_producers; i++) {
     g_producer_threads.push_back(std::thread(synthesize_data, utils.params));
   }
 }
@@ -157,10 +161,10 @@ void* get_sample(void) {
 
   //Get next sample
   while(!g_data_pool.pop(data)) {
-    /*Failed to pop, wait maybe? (again, cv more appropriate. do later) */
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    /* Failed to pop, poll until something is pushed */
+    
   }
-
+  
   return (void*)data;
 }
 
@@ -210,9 +214,14 @@ void set_sigsegv_handler() {
 }
 
 /* Called before using python generator function */
-void mts_init(void) {
+void mts_init(int num_producers) {
   //set_sigsegv_handler(); -- uncomment for segfault recovery
-  run_producers();
+  run_producers(num_producers);
+
+  //name threads for debugging purposes
+  for(auto& thd : g_producer_threads) {
+    pthread_setname_np(thd.native_handle(), "producer");
+  }
 }
 
 
