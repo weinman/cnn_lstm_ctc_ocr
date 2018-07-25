@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# test.py -- Calculates metrics on an entire set of TFRecord files
+# test.py -- Calculates evaluation metrics on an entire Dataset
 
 import tensorflow as tf
 import pipeline
@@ -46,7 +46,8 @@ tf.app.flags.DEFINE_boolean( 'static_data', True,
 
 def _get_input():
     """
-    Get dataset according to tf flags for testing using Estimator
+    Get tf.data.Dataset object according to command-line flags for testing
+    using tf.estimator.Estimator
     Returns:
       dataset : elements structured as [features, labels]
                 feature structure can be seen in postbatch_fn 

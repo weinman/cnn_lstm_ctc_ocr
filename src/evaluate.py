@@ -52,9 +52,12 @@ tf.logging.set_verbosity( tf.logging.WARN )
 
 def _get_input():
     """
-    Get dataset according to tf flags for training using Estimator
+    Get tf.data.Dataset object according to command-line flags for evaluation
+    using tf.estimator.Estimator
+
     Note: Default behavior is bucketing according to default bucket boundaries
     listed in pipeline.get_data
+
     Returns:
       features, labels
                 feature structure can be seen in postbatch_fn 
@@ -76,12 +79,7 @@ def _get_input():
                                  input_device=FLAGS.device,
                                  filter_fn=filter_fn )
 
-    iterator = dataset.make_one_shot_iterator()
-
-    # Transforming the input into proper format
-    features, labels = iterator.get_next()
-
-    return features, labels
+    return dataset
 
 
 # Taken from the official source code of Tensorflow
@@ -115,8 +113,11 @@ def _get_config():
 
 def main(argv=None):
     
-    # Get input tensors for evaluation
-    features, labels = _get_input()
+    dataset = _get_input()
+
+    # Extract input tensors for evaluation
+    iterator = dataset.make_one_shot_iterator()
+    features, labels = iterator.get_next()
 
     # Construct the evaluation function 
     evaluate_fn = model_fn.evaluate_fn(FLAGS.device)
