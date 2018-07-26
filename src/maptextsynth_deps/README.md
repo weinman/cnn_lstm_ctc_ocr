@@ -1,2 +1,1 @@
-If this directory is staying here, please enhance the description of
-the context for it, use, etc.
+This directory currently exists as an intermediate home for interfacing with the MapTextSynthesizer C++ library. This will likely be migrated, along with the bulk of data_synth.py into the MapTextSynthesizer repository at a later date. 
