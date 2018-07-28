@@ -1,5 +1,5 @@
 # CNN-LSTM-CTC-OCR
-# Copyright (C) 2017 Jerod Weinman
+# Copyright (C) 2017, 2018 Jerod Weinman
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -213,7 +213,9 @@ def main(argv=None):
             finally:
                 coord.request_stop()
 
-            final_vals = sess.run([metrics,label_error,sequence_error])
+            metrics.extend([label_error,sequence_error])
+
+            final_vals = sess.run(metrics)
             print final_vals
 
         coord.join(threads)

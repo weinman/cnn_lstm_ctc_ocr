@@ -1,16 +1,15 @@
 # Overview
 
 This collection demonstrates how to construct and train a deep,
-bidirectional stacked LSTM using a CNN features as input with CTC loss
-to perform robust word recognition. The model is a straightforward
-adaptation of Shi et al.'s CRNN architecture
-([arXiv:1507.0571](https://arxiv.org/abs/1507.05717)). The provided code
-downloads and trains using Jaderberg et al.'s synthetic data ([IJCV
-2016](http://dx.doi.org/10.1007/s11263-015-0823-z)).
+bidirectional stacked LSTM using CNN features as input with CTC loss
+to perform robust word recognition.
 
-Currently updated for TensorFlow 1.8
-Developed in TensorFlow 1.1
+The model is a straightforward adaptation of Shi et al.'s CRNN
+architecture ([arXiv:1507.0571](https://arxiv.org/abs/1507.05717)).
+The provided code downloads and trains using Jaderberg et al.'s
+synthetic data ([IJCV 2016](http://dx.doi.org/10.1007/s11263-015-0823-z)).
 
+Currently updated for TensorFlow 1.8.
 
 # Structure
 
@@ -80,26 +79,44 @@ error, both varying by 2–5%.
 
 # Testing
 
-The test script streams statistics for small batches of validation (or test)
-data. It prints the iteration, test batch loss, label error (percentage of
-characters predicted incorrectly), and the sequence error (percentage of
-words—entire sequences—predicted incorrectly.)
+The test script (`src/test.py`) streams statistics for small batches
+of validation (or test) data. It prints the iteration, test batch
+loss, label error (percentage of characters predicted incorrectly),
+and the sequence error (percentage of words—entire sequences—predicted
+incorrectly.)
+
+The evaluation script (`src/evaluate.py`) tallies statistics, finally
+normalizing for all data. It prints the label error, total number of
+labels, sequence error, total number of sequences, and the label error
+rate and sequence error rate.
 
 # Validation
 
-To see the output of a small set of instances, the script `validation.py` 
-allows you to load a model and read an image one at a time via the process's 
-standard input and print the decoded output for each. For example
+To see the output of a small set of instances, the script
+`validation.py` allows you to load a model and read an image one at a
+time via the process's standard input and print the decoded output for
+each. For example
 
     cd src ; python validate.py < ~/paths_to_images.txt
 
-Alternatively, you can run the program interactively by typing image paths
-in the terminal (one per line, type Control-D when you want the model to run the
-input entered so far).
+Alternatively, you can run the program interactively by typing image
+paths in the terminal (one per line, type Control-D when you want the
+model to run the input entered so far).
 
 # Configuration
 
 There are many command-line options to configure training
-parameters. Run `train.py` or `test.py` with the `--help` flag to see
-them or inspect the scripts. Model parameters are not command-line
-configurable and need to be edited in the code (see `model.py`).
+parameters. Run (e.g., `train.py`) with the `--help` flag to see these
+options, or else inspect the scripts. Model parameters are *not*
+command-line configurable and need to be edited in the code (see
+`model.py`).
+
+# API Notes
+
+This version uses the original TensorFlow
+[Reader](https://www.tensorflow.org/versions/r1.8/api_guides/python/io_ops#Readers)
+and
+[QueueRunner](https://www.tensorflow.org/versions/r1.8/api_guides/python/reading_data#_QueueRunner)
+mechanisms for fast, parallel I/O. For training it uses a
+straightforward
+[MonitoredTrainingSession](https://www.tensorflow.org/versions/r1.8/api_docs/python/tf/train/MonitoredTrainingSession). Testing and evaluation manually manage sessions and checkpoints.

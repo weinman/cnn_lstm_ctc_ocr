@@ -28,3 +28,6 @@ monitor:
 
 test:
 	cd src ; python test.py # use --help for options
+
+evaluate:
+	cd src ; python evaluate.py # --use help for options
