@@ -14,10 +14,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# maptextsynth.py -- Input pipeline for dynamically generated
+#   synthetic text images
+
 import os
 import tensorflow as tf
 import numpy as np
-from map_generator import data_generator
+from data_synth import data_generator
 import pipeline
 import charset
 
@@ -30,16 +33,17 @@ def get_dataset( args=None ):
         _generator_wrapper, 
         (tf.string, tf.int32, tf.int32),   # Output Types
         (tf.TensorShape( [] ),             # Text shape
-         tf.TensorShape( (32, None, 3) ),  # Image shape
+         tf.TensorShape( (32, None, 1) ),  # Image shape
          tf.TensorShape( [None] )) )       # Labels shape
     
+
 def preprocess_fn( caption, image, labels ):
     """
     Reformat raw data for model trainer. 
     Intended to get data as formatted from get_dataset function.
     Parameters:
       caption : tf.string corresponding to text
-      image   : tf.int32 tensor of shape [32, ?, 3]
+      image   : tf.int32 tensor of shape [32, ?, 1]
       labels  : tf.int32 tensor of shape [?]
     Returns:
       image   : preprocessed image
@@ -52,7 +56,6 @@ def preprocess_fn( caption, image, labels ):
                   tf.int32 tensor of shape []
       text    : ground truth string
                   tf.string tensor of shape []
-    
     """
     image = _preprocess_image( image )
 
@@ -66,6 +69,7 @@ def preprocess_fn( caption, image, labels ):
     text = caption
 
     return image, width, labels, length, text
+
 
 def postbatch_fn( image, width, label, length, text ):
     """ 
@@ -87,12 +91,14 @@ def postbatch_fn( image, width, label, length, text ):
 
     return features, label
 
+
 def element_length_fn( image, width, label, length, text ):
     """ 
     Determine element length
-    Note: mjsynth version of this function has extra parameter (filename)
+    Note: mjsynth version of this function has an extra parameter (filename)
     """
     return width
+
 
 def _generator_wrapper():
     """
@@ -116,10 +122,9 @@ def _generator_wrapper():
 
         yield caption, image, label
 
+
 def _preprocess_image( image ):
     """Convert image to grayscale and rescale"""
-    # Final image should be pre-grayed in opencv *before* generation
-    image = tf.image.rgb_to_grayscale( image ) 
     
     image = pipeline.rescale_image( image )
 

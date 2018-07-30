@@ -14,6 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# train.py -- Train all or only part of the model from scratch or an
+#   existing checkpoint.
+
 import tensorflow as tf
 import pipeline
 import charset
@@ -72,9 +75,12 @@ tf.logging.set_verbosity( tf.logging.INFO )
 
 def _get_input():
     """
-    Get dataset according to tf flags for training using Estimator
+    Get tf.data.Dataset according to command-line flags for training 
+    using tf.estimator.Estimator
+
     Note: Default behavior is bucketing according to default bucket boundaries
     listed in pipeline.get_data
+
     Returns:
       dataset : elements structured as [features, labels]
                 feature structure can be seen in postbatch_fn 

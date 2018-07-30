@@ -14,6 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# model_fn.py -- Provides functions necessary for using the Estimator
+#   API to control training, evaluation, and prediction.
+
 import tensorflow as tf 
 import model
 import mjsynth
@@ -36,7 +39,7 @@ def _get_image_info( features, mode ):
 
 
 def _get_init_pretrained( tune_from ):
-    """Return lambda for reading pretrained initial model"""
+    """Return lambda for reading pretrained initial model with a given session"""
     
     if not tune_from:
         return None
@@ -62,7 +65,8 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
 
         if tune_scope:
             scope=tune_scope
-        else:            scope="convnet|rnn"
+        else:            
+            scope="convnet|rnn"
 
         rnn_vars = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES,
                                        scope=scope )        
@@ -222,17 +226,14 @@ def _get_output( rnn_logits,sequence_length, lexicon ):
 	if lexicon:
 	    dict_tensor = _get_dictionary_tensor( lexicon, 
                                                   charset.out_charset )
-	    predictions,_ = tf.nn.ctc_beam_search_decoder_trie( rnn_logits,
-                                                                sequence_length,
-                                                                alphabet_size=
-                                                                pipeline.
-                                                                num_classes() ,
-                                                                dictionary=
-                                                                dict_tensor,
-                                                                beam_width=128,
-                                                                top_paths=1,
-                                                                merge_repeated=
-                                                                True )
+	    predictions,_ = tf.nn.ctc_beam_search_decoder_trie( 
+                rnn_logits,
+                sequence_length,
+                alphabet_size=pipeline.num_classes() ,
+                dictionary=dict_tensor,
+                beam_width=128,
+                top_paths=1,
+                merge_repeated=True )
 	else:
 	    predictions,_ = tf.nn.ctc_beam_search_decoder( rnn_logits,
                                                            sequence_length,
@@ -330,24 +331,14 @@ def evaluate_fn( device ):
             
             # All the eval_metric_ops that will be passed on to the 
             # EstimatorSpec object
-            eval_metric_ops = {'mean_label_error': 
-                               ( mean_label_error, 
-                                 update_op_label ),
-                               'mean_sequence_error': 
-                               ( mean_sequence_error,
-                                 update_op_seq ),
-                               'total_num_label_errors': 
-                               ( total_num_label_errors,
-                                 tf.no_op() ),
-                               'total_num_labels':
-                               ( total_num_labels,
-                                 tf.no_op() ),
-                               'total_num_sequence_errs':
-                               ( total_num_sequence_errs,
-                                 tf.no_op() ),
-                               'total_num_sequences':
-                               ( total_num_sequences, 
-                                 tf.no_op() )}
+            eval_metric_ops = {
+                'mean_label_error': ( mean_label_error, update_op_label ),
+                'mean_sequence_error': ( mean_sequence_error, update_op_seq ),
+                'total_num_label_errors': ( total_num_label_errors, tf.no_op() ),
+                'total_num_labels':( total_num_labels, tf.no_op() ),
+                'total_num_sequence_errs': ( total_num_sequence_errs, tf.no_op() ),
+                'total_num_sequences': ( total_num_sequences, tf.no_op() ) 
+            }
             
             return tf.estimator.EstimatorSpec( mode=mode, 
                                                loss=loss, 
@@ -368,7 +359,7 @@ def predict_fn( device, lexicon ):
         proc_image = mjsynth.preprocess_image( image )
         proc_image = tf.reshape( proc_image,[1,32,-1,1] ) # Make first dim batch
 
-        #Pack the modified image data into a dictionary
+        # Pack the modified image data into a dictionary
         proc_img_data = {'image': proc_image, 'width': width}
 
         with tf.device( device ):

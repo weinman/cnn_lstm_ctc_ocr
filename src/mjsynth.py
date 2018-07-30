@@ -14,14 +14,37 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# mjsynth.py -- Suite of routines for processing MJSynth data stored
+#   as Examples in in TFRecord files.
+
 import os
 import tensorflow as tf
 import numpy as np
 import pipeline
 
 def get_dataset( args ):
+    """ Get a Dataset from TFRecord files.
+    Parameters:
+      base_dir      : Directory containing the TFRecord files
+      file_patterns : List of wildcard patterns for TFRecord files to read
+      num_threads   : Number of threads to use for reading and processing
+      buffer_sz     : Number of Examples to prefetch and buffer
+    Returns:
+      image   : preprocessed image
+                  tf.float32 tensor of shape [32, ?, 1] (? = width)
+      width   : width (in pixels) of image
+                  tf.int32 tensor of shape []
+      labels  : list of indices of characters mapping text->out_charset
+                  tf.int32 tensor of shape [?] (? = length+1)
+      length  : length of labels (sans -1 EOS token)
+                  tf.int32 tensor of shape []
+      text    : ground truth string
+                  tf.string tensor of shape []
+    """
+
+
     # Extract args
-    [ base_dir, file_patterns, num_threads, capacity ] = args[0:4]
+    [ base_dir, file_patterns, num_threads, buffer_sz ] = args[0:4]
 
     # Get filenames as list of tensors
     tensor_filenames = _get_filenames( base_dir, file_patterns )
@@ -35,9 +58,9 @@ def get_dataset( args ):
     
     dataset = tf.data.TFRecordDataset( ds_filenames, 
                                        num_parallel_reads=num_threads,
-                                       buffer_size=capacity )
+                                       buffer_size=buffer_sz )
 
-    return dataset.prefetch( capacity )
+    return dataset.prefetch( buffer_sz )
 
 def preprocess_fn( data ):
     """Parse the elements of the dataset"""
@@ -73,8 +96,10 @@ def preprocess_fn( data ):
 
     return image, width, label, length, text, filename
 
+
 def element_length_fn( image, width, label, length, text, filename ):
     return width
+
 
 def postbatch_fn( image, width, label, length, text, filename ):
     # Batching complete, so now we can re-sparsify our labels for ctc_loss
@@ -92,6 +117,7 @@ def postbatch_fn( image, width, label, length, text, filename ):
 
     return features, label
 
+
 def _get_filenames( base_dir, file_patterns=['*.tfrecord'] ):
     """Get a list of record files"""
     
@@ -103,11 +129,12 @@ def _get_filenames( base_dir, file_patterns=['*.tfrecord'] ):
 
     return data_files
 
+
 def preprocess_image( image ):
     """Preprocess image: Rescale and fix image height"""
 
-    image = pipeline.rescale_image( image )
     # Rescale from uint8([0,255]) to float([-0.5,0.5])
+    image = pipeline.rescale_image( image )
 
     # Pad with copy of first row to expand to 32 pixels height
     first_row = tf.slice( image, [0, 0, 0], [1, -1, -1] )

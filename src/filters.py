@@ -47,7 +47,8 @@
 import tensorflow as tf
 import model
 
-# Note: The following 2 filters only work for dynamic data. No filename param.
+# Note: The following two filters only work for the dynamic data
+# pipeline, where there is no filename parameter from the Dataset.
 
 def dyn_filter_by_width( image, width, label, length, text ):
     return tf.greater( width, 20 )
