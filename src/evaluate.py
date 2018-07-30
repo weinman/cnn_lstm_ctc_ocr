@@ -14,12 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 import tensorflow as tf
 from tensorflow.python.ops import control_flow_ops
 import six
 import model_fn
 import pipeline
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 FLAGS = tf.app.flags.FLAGS
 
 
@@ -43,7 +45,7 @@ tf.app.flags.DEFINE_boolean( 'static_data', True,
                              """Whether to use static data 
                              (false for dynamic data)""" )
 
-tf.logging.set_verbosity( tf.logging.WARN )
+#tf.logging.set_verbosity( tf.logging.WARN )
 #tf.logging.set_verbosity( tf.logging.INFO )
 
 def _get_input():
