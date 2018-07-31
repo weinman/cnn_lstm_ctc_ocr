@@ -27,8 +27,12 @@
 #include <pthread.h>
 #include <signal.h>
 
+
 // Num elements to hold in g_data_pool queue
-#define BUFFER_SIZE 5000
+#define BUFFER_SIZE 1000
+#define NUM_PRODUCERS 4
+
+void synthesize_data(shared_ptr<unordered_map<string, double> > params);
 
 // Contains all of the raw data of a sample
 typedef struct sample {
@@ -38,16 +42,34 @@ typedef struct sample {
   char* caption;
 } sample_t;
 
+class MTS_Buffered {
+public:
+  void init(int num_producers);
+  boost::lockfree::queue<sample_t*> data_pool;
+  std::vector<std::thread> producer_threads;
+  void cleanup();
+};
+
+void MTS_Buffered::init(int num_producers) {
+  
+  MTS_Utilities utils = MTS_Utilities();
+
+  for(int i = 0; i < num_producers; i++) {
+    this.producer_threads.push_back(std::thread(synthesize_data, utils.params));
+  }
+}
+
 // For ctypes visibility
 extern "C" {
-  unsigned char* get_img_data(void* ptr);
-  size_t get_height(void* ptr);
-  size_t get_width(void* ptr);
-  char* get_caption(void* ptr);
-  void mts_init(int num_producers);
-  void* get_sample(void);
-  void free_sample(void* ptr);
-  void mts_cleanup(void);
+  unsigned char* get_img_data(void* spl);
+  size_t get_height(void* spl);
+  size_t get_width(void* spl);
+  char* get_caption(void* spl);
+  void* mts_init(int num_producers);
+  void* get_sample(void* mts);
+  void free_sample(void* spl);
+  void mts_cleanup(void* mts);
+  void* get_sample_no_buff(void);
 }
 
 void free_sample(void* ptr) {
@@ -73,15 +95,16 @@ char* get_caption(void* ptr) {
 
 // Queue to manage concurrent producing/consuming
 boost::lockfree::queue<sample_t*> g_data_pool(BUFFER_SIZE);
-
+//boost::circular_buffer<sample_t*> g_data_pool(BUFFER_SIZE);
 // Maintain producer threads
 std::vector<std::thread> g_producer_threads;
 
 // producer threads keep producing while nonzero
 int g_keep_producing = 1;
-
-pthread_cond_t condvar = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+/*
+pthread_cond_t producer_cv = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t producer_m = PTHREAD_MUTEX_INITIALIZER;
+*/
 
 /* Get lexicon from a given file -- Will later be internal to MTS*/
 void read_words(string path, vector<String> &caps){
@@ -100,16 +123,16 @@ void prepare_synthesis(cv::Ptr<MapTextSynthesizer> s) {
   read_words("/home/gaffordb/new_mega_merge/cnn_lstm_ctc_ocr/src/maptextsynth_deps/IA/Civil_clean.txt",caps);
   
   vector<String> blocky;
-  blocky.push_back("MathJax_Fraktur");
-  blocky.push_back("eufm10");
+  blocky.push_back("Sans");
+  blocky.push_back("Serif");
 
   vector<String> regular;
-  regular.push_back("cmmi10");
+  //regular.push_back("cmmi10");
   regular.push_back("Sans");
   regular.push_back("Serif");
 
   vector<String> cursive;
-  cursive.push_back("URW Chancery L");
+  cursive.push_back("Sans");
 
   s->setSampleCaptions(caps);
   s->setBlockyFonts(blocky);
@@ -157,8 +180,8 @@ void synthesize_data(shared_ptr<unordered_map<string, double> > params) {
       /* If queue is full, maybe sleep a little bit??
        * Note: cv would probably be more appropriate here 
        */
-      //printf("Sleeping for 80 seconds.\n");
-      std::this_thread::sleep_for(std::chrono::seconds(2));
+      //printf("buff full. sleeping 1 second.\n");
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
   }
 }
@@ -180,11 +203,13 @@ void* get_sample(void) {
   //Get next sample
   while(!g_data_pool.pop(data)) {
     /* Failed to pop, poll until something is pushed */
-    
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
   }
   
   return (void*)data;
 }
+
 
 /* For less elegant cleanup */
 void mts_force_cleanup(void) {
@@ -234,11 +259,11 @@ void set_sigsegv_handler() {
 /* Called before using python generator function */
 void mts_init(int num_producers) {
   //set_sigsegv_handler(); -- uncomment for segfault recovery
-  run_producers(num_producers);
+  run_producers(NUM_PRODUCERS);
 
   //name threads for debugging purposes
   for(auto& thd : g_producer_threads) {
-    pthread_setname_np(thd.native_handle(), "producer");
+    //pthread_setname_np(thd.native_handle(), "producer");
   }
 }
 
@@ -254,4 +279,51 @@ void mts_cleanup(void) {
   }
 }
 
+
+/* For debugging purposes only */
+void* get_sample_no_buff(void) {
+
+  MTS_Utilities g_utils = MTS_Utilities();
+  auto g_synthesizer = MapTextSynthesizer::create(g_utils.params);
+
+  int g_prepped = 0;
+
+  if(!g_prepped) {
+    prepare_synthesis(g_synthesizer);
+    g_prepped = 1;
+  }
+  
+  String label;
+  Mat image;
+
+  // Fill in label, image
+  g_synthesizer->generateSample(label, image);
+
+  // Stick the necessary data into sample_t struct
+  sample_t* spl = (sample_t*)malloc(sizeof(sample_t));
+  if(spl == NULL) {
+    perror("OOM, failed to allocate sample struct.\n");
+  }
+
+  size_t num_elements = image.rows * image.cols;
+  size_t buff_size = num_elements * sizeof(unsigned char); 
+  
+  //allocate enough space for img_data
+  if(!(spl->img_data = (unsigned char*)malloc(buff_size))) {
+    perror("failed to allocate image data!\n");
+  }
+  
+  //copy into image data 
+  memcpy(spl->img_data, image.data, buff_size);
+  spl->height = image.rows;
+  spl->width = image.cols;
+  
+  //get a copy of the string
+  if(!(spl->caption = strdup(((std::string)label).c_str()))) {
+    mts_cleanup();
+    perror("failed to allocate memory for caption!\n");
+  }
+  
+  return (void*)spl;
+}
 
