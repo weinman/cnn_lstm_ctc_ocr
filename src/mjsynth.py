@@ -60,7 +60,8 @@ def get_dataset( args ):
                                        num_parallel_reads=num_threads,
                                        buffer_size=buffer_sz )
 
-    return dataset.prefetch( buffer_sz )
+    return dataset
+
 
 def preprocess_fn( data ):
     """Parse the elements of the dataset"""
