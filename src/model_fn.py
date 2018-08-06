@@ -51,7 +51,7 @@ def _get_init_pretrained( tune_from ):
     ckpt_path=tune_from
 
     # Function to build the scaffold to initialize the training process
-    init_fn = lambda sess: saver_reader.restore( sess, ckpt_path )
+    init_fn = lambda scaffold, sess: saver_reader.restore( sess, ckpt_path )
 
     return init_fn
 
@@ -250,8 +250,6 @@ def train_fn( scope, tune_from, train_device, learning_rate,
     def train( features, labels, mode ):
 
         with tf.device( train_device ):
-            scaffold = tf.train.Scaffold( init_fn=
-                                          _get_init_pretrained( tune_from ) )
             
             logits, sequence_length = _get_image_info( features, mode )
 
@@ -260,6 +258,10 @@ def train_fn( scope, tune_from, train_device, learning_rate,
                                             scope, learning_rate, 
                                             decay_steps, decay_rate, 
                                             decay_staircase, momentum )
+
+            # Initialize weights from a pre-trained model
+            scaffold = tf.train.Scaffold( init_fn=
+                                          _get_init_pretrained( tune_from ) )
 
             return tf.estimator.EstimatorSpec( mode=mode, 
                                                loss=loss, 
