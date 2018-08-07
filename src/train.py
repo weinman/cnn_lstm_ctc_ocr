@@ -96,9 +96,7 @@ def _get_input():
 
     # Pack keyword arguments into dictionary
     data_args = { 'base_dir': FLAGS.train_path,
-                  'file_patterns': str.split(
-                      FLAGS.filename_pattern,
-                      ','),
+                  'file_patterns': str.split(FLAGS.filename_pattern, ','),
                   'num_threads': FLAGS.num_input_threads,
                   'batch_size': FLAGS.batch_size,
                   'input_device': FLAGS.input_device,
