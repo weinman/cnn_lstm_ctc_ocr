@@ -79,7 +79,7 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
         with tf.control_dependencies( extra_update_ops ):
             
             # Calculate the learning rate given the parameters
-            learning_rate_final = tf.train.exponential_decay(
+            learning_rate_tensor = tf.train.exponential_decay(
                 learning_rate,
                 tf.train.get_global_step(),
                 decay_steps,
@@ -88,17 +88,17 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
                 name='learning_rate' )
 
             optimizer = tf.train.AdamOptimizer(
-                learning_rate=learning_rate,
+                learning_rate=learning_rate_tensor,
                 beta1=momentum )
 
             train_op = tf.contrib.layers.optimize_loss(
                 loss=loss,
                 global_step=tf.train.get_global_step(),
-                learning_rate=learning_rate_final, 
+                learning_rate=learning_rate_tensor, 
                 optimizer=optimizer,
                 variables=rnn_vars )
 
-            tf.summary.scalar( 'learning_rate', learning_rate )
+            tf.summary.scalar( 'learning_rate', learning_rate_tensor )
 
     return train_op, loss
 
