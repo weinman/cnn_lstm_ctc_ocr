@@ -32,6 +32,8 @@ tf.app.flags.DEFINE_string( 'model','../data/model',
                             """Directory for model checkpoints""" )
 tf.app.flags.DEFINE_string( 'device','/gpu:0',
                             """Device for graph placement""" )
+tf.app.flags.DEFINE_boolean( 'print_score', False,
+                             """Print log probability scores with predictions""" )
 tf.app.flags.DEFINE_string( 'lexicon','',
 			    """File containing lexicon of image words""" )
 
@@ -91,7 +93,12 @@ def main(argv=None):
     # Get all the predictions in string format
     while True:
         try:
-            print( charset.label_to_string( next( predictions )))
+            results = next( predictions )
+            pred_str = charset.label_to_string( results['labels'] )
+            if FLAGS.print_score:
+                print pred_str, results['score'][0]
+            else:
+                print pred_str
         except StopIteration:
             sys.exit()
     
