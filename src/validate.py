@@ -92,7 +92,7 @@ def main(argv=None):
     while True:
         try:
             print( charset.label_to_string( next( predictions )))
-        except:
+        except StopIteration:
             sys.exit()
     
 if __name__ == '__main__':

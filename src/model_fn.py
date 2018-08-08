@@ -21,6 +21,10 @@ import tensorflow as tf
 import model
 import mjsynth
 import charset
+import pipeline
+
+from lexicon import dictionary_from_file
+
 
 def _get_image_info( features, mode ):
     """Calculates the logits and sequence length"""
@@ -229,7 +233,7 @@ def _get_output( rnn_logits,sequence_length, lexicon ):
 	    predictions,_ = tf.nn.ctc_beam_search_decoder_trie( 
                 rnn_logits,
                 sequence_length,
-                alphabet_size=pipeline.num_classes() ,
+                alphabet_size=charset.num_classes() ,
                 dictionary=dict_tensor,
                 beam_width=128,
                 top_paths=1,
