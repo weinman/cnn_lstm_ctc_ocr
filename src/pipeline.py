@@ -64,6 +64,8 @@ def get_data( static_data,
                        num_threads, 
                        num_buffered_elements )
     else:
+        # This is for dynamic data only -- refer to README.md
+        # for more usage instructions if relevant
         import maptextsynth as dpipe
         dpipe_args = ( synth_config_file,
                        synth_lexicon_file )
