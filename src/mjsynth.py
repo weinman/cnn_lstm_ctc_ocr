@@ -44,7 +44,7 @@ def get_dataset( args ):
 
 
     # Extract args
-    [ base_dir, file_patterns, num_threads, capacity ] = args[0:4]
+    [ base_dir, file_patterns, num_threads, buffer_sz ] = args[0:4]
 
     # Get filenames as list of tensors
     tensor_filenames = _get_filenames( base_dir, file_patterns )
@@ -58,7 +58,8 @@ def get_dataset( args ):
     
     dataset = tf.data.TFRecordDataset( ds_filenames, 
                                        num_parallel_reads=num_threads,
-                                       buffer_size=capacity )
+                                       buffer_size=buffer_sz )
+
     return dataset
 
 

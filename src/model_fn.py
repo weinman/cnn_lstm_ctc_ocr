@@ -51,7 +51,7 @@ def _get_init_pretrained( tune_from ):
     ckpt_path=tune_from
 
     # Function to build the scaffold to initialize the training process
-    init_fn = lambda sess: saver_reader.restore( sess, ckpt_path )
+    init_fn = lambda scaffold, sess: saver_reader.restore( sess, ckpt_path )
 
     return init_fn
 
@@ -79,7 +79,7 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
         with tf.control_dependencies( extra_update_ops ):
             
             # Calculate the learning rate given the parameters
-            learning_rate_final = tf.train.exponential_decay(
+            learning_rate_tensor = tf.train.exponential_decay(
                 learning_rate,
                 tf.train.get_global_step(),
                 decay_steps,
@@ -88,17 +88,17 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
                 name='learning_rate' )
 
             optimizer = tf.train.AdamOptimizer(
-                learning_rate=learning_rate,
+                learning_rate=learning_rate_tensor,
                 beta1=momentum )
 
             train_op = tf.contrib.layers.optimize_loss(
                 loss=loss,
                 global_step=tf.train.get_global_step(),
-                learning_rate=learning_rate_final, 
+                learning_rate=learning_rate_tensor, 
                 optimizer=optimizer,
                 variables=rnn_vars )
 
-            tf.summary.scalar( 'learning_rate', learning_rate )
+            tf.summary.scalar( 'learning_rate', learning_rate_tensor )
 
     return train_op, loss
 
@@ -250,8 +250,6 @@ def train_fn( scope, tune_from, train_device, learning_rate,
     def train( features, labels, mode ):
 
         with tf.device( train_device ):
-            scaffold = tf.train.Scaffold( init_fn=
-                                          _get_init_pretrained( tune_from ) )
             
             logits, sequence_length = _get_image_info( features, mode )
 
@@ -260,6 +258,10 @@ def train_fn( scope, tune_from, train_device, learning_rate,
                                             scope, learning_rate, 
                                             decay_steps, decay_rate, 
                                             decay_staircase, momentum )
+
+            # Initialize weights from a pre-trained model
+            scaffold = tf.train.Scaffold( init_fn=
+                                          _get_init_pretrained( tune_from ) )
 
             return tf.estimator.EstimatorSpec( mode=mode, 
                                                loss=loss, 

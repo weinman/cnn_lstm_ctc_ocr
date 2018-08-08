@@ -69,10 +69,14 @@ tf.app.flags.DEFINE_integer('width_threshold',None,
                             """Limit of input image width""")
 tf.app.flags.DEFINE_integer('length_threshold',None,
                             """Limit of input string length width""")
+
 tf.app.flags.DEFINE_string('synth_config_file','../data/maptextsynth_config.txt',
                            """Location of config file for map text synthesizer""")
 tf.app.flags.DEFINE_string('synth_lexicon_file','../data/lexicon.txt',
                            """Location of synth lexicon""")
+
+tf.app.flags.DEFINE_boolean('bucket_data',True,
+                            """Bucket training data by width for efficiency""")
 
 # For displaying various statistics while training
 tf.logging.set_verbosity( tf.logging.INFO )
@@ -95,18 +99,23 @@ def _get_input():
     # We only want a filter_fn if we have dynamic data (for now)
     filter_fn = None if FLAGS.static_data else filters.dyn_filter_by_width
 
+    # Pack keyword arguments into dictionary
+    data_args = { 'base_dir': FLAGS.train_path,
+                  'file_patterns': str.split(FLAGS.filename_pattern, ','),
+                  'num_threads': FLAGS.num_input_threads,
+                  'batch_size': FLAGS.batch_size,
+                  'input_device': FLAGS.input_device,
+                  'filter_fn': filter_fn,
+                  'synth_config_file': FLAGS.synth_config_file,
+                  'synth_lexicon_file': FLAGS.synth_lexicon_file
+    }
+
+    if not FLAGS.bucket_data:
+        data_args['boundaries']=None # Turn off bucketing (on by default)
+        
     # Get data according to flags
-    dataset = pipeline.get_data( FLAGS.static_data,
-                                 base_dir=FLAGS.train_path,
-                                 file_patterns=str.split(
-                                     FLAGS.filename_pattern,
-                                     ','),
-                                 num_threads=FLAGS.num_input_threads,
-                                 batch_size=FLAGS.batch_size,
-                                 input_device=FLAGS.input_device,
-                                 filter_fn=filter_fn,
-                                 synth_config_file=FLAGS.synth_config_file,
-                                 synth_lexicon_file=FLAGS.synth_lexicon_file )
+    dataset = pipeline.get_data( FLAGS.static_data, **data_args)
+
     return dataset
 
 
