@@ -69,6 +69,10 @@ tf.app.flags.DEFINE_integer('width_threshold',None,
                             """Limit of input image width""")
 tf.app.flags.DEFINE_integer('length_threshold',None,
                             """Limit of input string length width""")
+tf.app.flags.DEFINE_string('synth_config_file','../data/maptextsynth_config.txt',
+                           """Location of config file for map text synthesizer""")
+tf.app.flags.DEFINE_string('synth_lexicon_file','../data/lexicon.txt',
+                           """Location of synth lexicon""")
 
 # For displaying various statistics while training
 tf.logging.set_verbosity( tf.logging.INFO )
@@ -100,13 +104,15 @@ def _get_input():
                                  num_threads=FLAGS.num_input_threads,
                                  batch_size=FLAGS.batch_size,
                                  input_device=FLAGS.input_device,
-                                 filter_fn=filter_fn )
+                                 filter_fn=filter_fn,
+                                 synth_config_file=FLAGS.synth_config_file,
+                                 synth_lexicon_file=FLAGS.synth_lexicon_file )
     return dataset
 
 
 def _get_config():
     """Setup config to soften device placement and set chkpt saving intervals"""
-
+    
     device_config=tf.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False)
@@ -114,7 +120,6 @@ def _get_config():
     custom_config = tf.estimator.RunConfig(session_config=device_config,
                                            save_checkpoints_secs=
                                            FLAGS.save_checkpoint_secs)
-
     return custom_config 
 
 

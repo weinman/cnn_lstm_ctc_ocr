@@ -40,6 +40,10 @@ tf.app.flags.DEFINE_integer( 'num_input_threads',4,
 tf.app.flags.DEFINE_boolean( 'static_data', True,
                             """Whether to use static data 
                             (false for dynamic data)""" )
+tf.app.flags.DEFINE_string('synth_config_file','../data/maptextsynth_config.txt',
+                           """Location of config file for map text synthesizer""")
+tf.app.flags.DEFINE_string('synth_lexicon_file','../data/lexicon.txt',
+                           """Location of synth lexicon""")
 
 #tf.logging.set_verbosity( tf.logging.WARN )
 #tf.logging.set_verbosity( tf.logging.INFO )
@@ -67,8 +71,10 @@ def _get_input():
                                  num_threads=FLAGS.num_input_threads,
                                  batch_size=FLAGS.batch_size,
                                  input_device=FLAGS.device,
-                                 filter_fn=filter_fn, 
-                                 num_epochs=1)
+                                 filter_fn=filter_fn,
+                                 synth_config_file=FLAGS.synth_config_file,
+                                 synth_lexicon_file=FLAGS.synth_lexicon_file,
+                                 num_epochs=1 )
     return dataset
 
 
