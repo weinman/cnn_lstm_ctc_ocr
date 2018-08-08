@@ -108,18 +108,18 @@ configurable and need to be edited in the code (see `model.py`).
 
 Dynamic data can be used for training or testing by setting the `--static_data` flag to False.  
 
-Dynamic data is synthesized using the MapTextSynthesizer created by Ziwen Chen and Liam Niehus-Staab. The repository is located at: https://github.com/arthurhero/MapTextSynthesizer  
+Dynamic data is synthesized using the MapTextSynthesizer created by Ziwen Chen and Liam Niehus-Staab. The repository is located at: https://github.com/niehusst/MapTextSynthesizer  
 
 Relevant code for MTS (MapTextSynthesizer) can be found within the following directory in the MTS repository: MapTextSynthesizer/tensorflow/generator
 
 # Dynamic data configuration
 ```
-git clone https://github.com/arthurhero/MapTextSynthesizer.git
+git clone https://github.com/niehusst/MapTextSynthesizer.git
 cd ./MapTextSynthesizer
 export PKG_CONFIG_PATH=`pwd`
 cd ./tensorflow/generator/
 make lib
-export PYTHONPATH=/path/to/MapTextSynthesizer/tensorflow/generator
+export PYTHONPATH=`pwd`
 ```
 If these steps are completed successfully, then train.py --static_data=False should run successfully.  
 Additional configuration options to keep in mind with dynamic data:
