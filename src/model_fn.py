@@ -21,6 +21,10 @@ import tensorflow as tf
 import model
 import mjsynth
 import charset
+import pipeline
+
+from lexicon import dictionary_from_file
+
 
 def _get_image_info( features, mode ):
     """Calculates the logits and sequence length"""
@@ -79,7 +83,7 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
         with tf.control_dependencies( extra_update_ops ):
             
             # Calculate the learning rate given the parameters
-            learning_rate_final = tf.train.exponential_decay(
+            learning_rate_tensor = tf.train.exponential_decay(
                 learning_rate,
                 tf.train.get_global_step(),
                 decay_steps,
@@ -88,17 +92,17 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
                 name='learning_rate' )
 
             optimizer = tf.train.AdamOptimizer(
-                learning_rate=learning_rate_final,
+                learning_rate=learning_rate_tensor,
                 beta1=momentum )
 
             train_op = tf.contrib.layers.optimize_loss(
                 loss=loss,
                 global_step=tf.train.get_global_step(),
-                learning_rate=learning_rate_final, 
+                learning_rate=learning_rate_tensor, 
                 optimizer=optimizer,
                 variables=rnn_vars )
 
-            tf.summary.scalar( 'learning_rate', learning_rate )
+            tf.summary.scalar( 'learning_rate', learning_rate_tensor )
 
     return train_op, loss
 
@@ -218,29 +222,30 @@ def _get_dictionary_tensor( dictionary_path, charset ):
 	dictionary_from_file( dictionary_path, charset )))
 
 
-def _get_output( rnn_logits,sequence_length, lexicon ):
+def _get_output( rnn_logits, sequence_length, lexicon ):
     """Create ops for validation
        predictions: Results of CTC beam search decoding
+       log_prob: Score of predictions
     """
     with tf.name_scope("test"):
 	if lexicon:
 	    dict_tensor = _get_dictionary_tensor( lexicon, 
                                                   charset.out_charset )
-	    predictions,_ = tf.nn.ctc_beam_search_decoder_trie( 
+	    predictions,log_prob = tf.nn.ctc_beam_search_decoder_trie( 
                 rnn_logits,
                 sequence_length,
-                alphabet_size=pipeline.num_classes() ,
+                alphabet_size=charset.num_classes() ,
                 dictionary=dict_tensor,
                 beam_width=128,
                 top_paths=1,
                 merge_repeated=True )
 	else:
-	    predictions,_ = tf.nn.ctc_beam_search_decoder( rnn_logits,
+	    predictions,log_prob = tf.nn.ctc_beam_search_decoder( rnn_logits,
                                                            sequence_length,
                                                            beam_width=128,
                                                            top_paths=1,
                                                            merge_repeated=True )
-    return predictions
+    return predictions, log_prob
 
 
 def train_fn( scope, tune_from, train_device, learning_rate, 
@@ -374,7 +379,7 @@ def predict_fn( device, lexicon ):
         with tf.device( device ):
             logits, sequence_length = _get_image_info(proc_img_data, mode)
 
-            prediction = _get_output( logits,sequence_length, lexicon )
+            prediction, log_prob = _get_output( logits,sequence_length, lexicon )
 
             # predictions only takes dense tensors
             final_pred = tf.sparse_to_dense( prediction[0].indices, 
@@ -382,6 +387,8 @@ def predict_fn( device, lexicon ):
                                              prediction[0].values, 
                                              default_value=0 ) 
 
-        return tf.estimator.EstimatorSpec( mode=mode,predictions=( final_pred ))
+        return tf.estimator.EstimatorSpec( mode=mode,
+                                           predictions={ 'labels': final_pred,
+                                                         'score': log_prob })
 
     return predict

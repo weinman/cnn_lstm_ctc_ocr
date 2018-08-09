@@ -27,7 +27,9 @@ def get_data( static_data,
               boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
               input_device=None,
               num_epochs=None,
-              filter_fn=None ):
+              filter_fn=None,
+              synth_config_file=None,
+              synth_lexicon_file=None ):
     """Get Dataset according to parameters
     Parameters:
       static_data   : boolean for whether to use static or dynamic data
@@ -39,6 +41,10 @@ def get_data( static_data,
       input_device  : Device for pinning ops
       num_epochs    : if None, data repeats infinitely (static data only)
       filter_fn     : filtering function
+      synth_config_file: 
+                      string for synthesizer config file (dynamic data only)
+      synth_lexicon_file: 
+                      string for synthesizer lexicon file (dynamic data only)
     Returns:
       dataset : tf.data.Dataset object.
                 elements structured as [features, labels]
@@ -58,8 +64,11 @@ def get_data( static_data,
                        num_threads, 
                        num_buffered_elements )
     else:
+        # This is for dynamic data only -- refer to README.md
+        # for more usage instructions if relevant
         import maptextsynth as dpipe
-        dpipe_args = None # Place future args for synthetic data here...
+        dpipe_args = ( synth_config_file,
+                       synth_lexicon_file )
 
     with tf.device( input_device ):
         # Get raw data
