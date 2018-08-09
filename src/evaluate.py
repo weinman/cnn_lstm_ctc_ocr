@@ -42,6 +42,9 @@ tf.app.flags.DEFINE_string( 'device','/gpu:0',
 
 tf.app.flags.DEFINE_string( 'model','../data/model',
                             """Directory for event logs and checkpoints""" )
+tf.app.flags.DEFINE_string( 'output','test',
+                            """Sub-directory of model for test summary events""" )
+
 tf.app.flags.DEFINE_string( 'test_path','../data/',
                             """Base directory for test/validation data""" )
 tf.app.flags.DEFINE_string( 'filename_pattern','val/words-*',
@@ -139,12 +142,18 @@ def main(argv=None):
     # Specify to evaluate N number of batches (in this case N==1)
     stop_hook = tf.contrib.training.StopAfterNEvalsHook( 1 )
 
+    # Create summaries of values added to tf.GraphKeys.SUMMARIES  
+    summary_writer = tf.summary.FileWriter (os.path.join(FLAGS.model,
+                                                         FLAGS.output))
+    summary_hook = tf.contrib.training.SummaryAtEndHook(summary_writer=
+                                                        summary_writer)
+    
     # Evaluate repeatedly once a new checkpoint is found
     tf.contrib.training.evaluate_repeatedly(
         checkpoint_dir=FLAGS.model,eval_ops=update_op, final_ops=value_ops, 
-        hooks = [stop_hook], config=_get_config(), 
+        hooks = [stop_hook, summary_hook], config=_get_config(), 
         eval_interval_secs= FLAGS.eval_interval_secs )
-  
-  
+
+   
 if __name__ == '__main__':
     tf.app.run()

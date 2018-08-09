@@ -88,7 +88,7 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
                 name='learning_rate' )
 
             optimizer = tf.train.AdamOptimizer(
-                learning_rate=learning_rate,
+                learning_rate=learning_rate_final,
                 beta1=momentum )
 
             train_op = tf.contrib.layers.optimize_loss(
@@ -311,16 +311,23 @@ def evaluate_fn( device ):
                 global_step = tf.train.get_or_create_global_step()
                 mean_sequence_error = tf.Print( mean_sequence_error, 
                                                 [global_step,
-                                                loss,
-                                                mean_label_error,
-                                                mean_sequence_error] )
+                                                 loss,
+                                                 mean_label_error,
+                                                 mean_sequence_error] ,
+                                                first_n=1)
+                
+                
 
                 # Create summaries for the approprite metrics during continous 
                 #eval
-                tf.summary.scalar( 'loss', loss)
-                tf.summary.scalar( 'mean_label_error', mean_label_error)
-                tf.summary.scalar( 'mean_sequence_error', mean_sequence_error )
-
+                tf.summary.scalar( 'evaluation_loss', tensor=loss,
+                                   family='continuous evaluation' )
+                tf.summary.scalar( 'mean_label_error', tensor=mean_label_error,
+                                   family='continuous evaluation' )
+                tf.summary.scalar( 'mean_sequence_error',
+                                   tensor=mean_sequence_error,
+                                   family='continuous evaluation' )
+   
             # Convert to tensor in order to pass it to eval_metric_ops
             total_num_label_errors = tf.convert_to_tensor(
                 total_num_label_errors)
