@@ -51,13 +51,11 @@ tf.app.flags.DEFINE_integer('max_num_steps', 2**21,
 tf.app.flags.DEFINE_boolean('static_data', True,
                             """Whether to use static data 
                             (false for dynamic data)""")
-tf.app.flags.DEFINE_integer('save_checkpoint_secs', 30,
+tf.app.flags.DEFINE_integer('save_checkpoint_secs', 120,
                             """Interval between daving checkpoints""")
 
-tf.app.flags.DEFINE_string('train_device','/gpu:1',
-                           """Device for training graph placement""")
-tf.app.flags.DEFINE_string('input_device','/gpu:0',
-                           """Device for preprocess/batching graph placement""")
+tf.app.flags.DEFINE_integer('num_gpus', 1,
+                            """Number of GPUs to use for distributed training""")
 
 tf.app.flags.DEFINE_string('train_path','../data/train/',
                            """Base directory for training data""")
@@ -99,12 +97,13 @@ def _get_input():
     # We only want a filter_fn if we have dynamic data (for now)
     filter_fn = None if FLAGS.static_data else filters.dyn_filter_by_width
 
+    gpu_batch_size = FLAGS.batch_size / FLAGS.num_gpus
+    
     # Pack keyword arguments into dictionary
     data_args = { 'base_dir': FLAGS.train_path,
                   'file_patterns': str.split(FLAGS.filename_pattern, ','),
                   'num_threads': FLAGS.num_input_threads,
-                  'batch_size': FLAGS.batch_size,
-                  'input_device': FLAGS.input_device,
+                  'batch_size': gpu_batch_size,
                   'filter_fn': filter_fn,
                   'synth_config_file': FLAGS.synth_config_file,
                   'synth_lexicon_file': FLAGS.synth_lexicon_file
@@ -118,7 +117,17 @@ def _get_input():
 
     return dataset
 
+def _get_distribution_strategy():
+    """Configure training distribution strategy"""
+    
+    if FLAGS.num_gpus == 1:
+        return tf.contrib.distribute.OneDeviceStrategy(device='/gpu:0')
+    elif FLAGS.num_gpus > 1:
+        return tf.contrib.distribute.MirroredStrategy(num_gpus=FLAGS.num_gpus)
+    else:
+        return None
 
+    
 def _get_config():
     """Setup config to soften device placement and set chkpt saving intervals"""
     
@@ -126,9 +135,11 @@ def _get_config():
         allow_soft_placement=True, 
         log_device_placement=False)
 
-    custom_config = tf.estimator.RunConfig(session_config=device_config,
-                                           save_checkpoints_secs=
-                                           FLAGS.save_checkpoint_secs)
+    custom_config = tf.estimator.RunConfig(
+        session_config=device_config,
+        train_distribute=_get_distribution_strategy(),
+        save_checkpoints_secs=FLAGS.save_checkpoint_secs)
+
     return custom_config 
 
 
@@ -137,7 +148,6 @@ def main( argv=None ):
     # Set up a dictionary of arguments to be passed for training
     train_args = {'scope': FLAGS.tune_scope, 
                   'tune_from': FLAGS.tune_from, 
-                  'train_device': FLAGS.train_device, 
                   'learning_rate': FLAGS.learning_rate, 
                   'decay_steps': FLAGS.decay_steps, 
                   'decay_rate': FLAGS.decay_rate, 

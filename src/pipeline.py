@@ -25,7 +25,6 @@ def get_data( static_data,
               num_threads=4,
               batch_size=32,
               boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
-              input_device=None,
               num_epochs=None,
               filter_fn=None,
               synth_config_file=None,
@@ -38,7 +37,6 @@ def get_data( static_data,
       num_threads   : number of threads to use for IO / preprocessing
       batch_size    : batch size
       boundaries    : boundaries for bucketing. If None, no bucketing
-      input_device  : Device for pinning ops
       num_epochs    : if None, data repeats infinitely (static data only)
       filter_fn     : filtering function
       synth_config_file: 
@@ -70,53 +68,52 @@ def get_data( static_data,
         dpipe_args = ( synth_config_file,
                        synth_lexicon_file )
 
-    with tf.device( input_device ):
-        # Get raw data
-        dataset = dpipe.get_dataset( dpipe_args )
-        dataset = dataset.prefetch( num_buffered_elements )
-        
-        # Preprocess data
-        dataset = dataset.map( dpipe.preprocess_fn, 
-                               num_parallel_calls=num_threads )
+    # Get raw data
+    dataset = dpipe.get_dataset( dpipe_args )
+    dataset = dataset.prefetch( num_buffered_elements )
+    
+    # Preprocess data
+    dataset = dataset.map( dpipe.preprocess_fn, 
+                           num_parallel_calls=num_threads )
+    dataset = dataset.prefetch( num_buffered_elements )
+    
+    # Remove input that doesn't fit necessary specifications
+    if filter_fn:
+        dataset = dataset.filter( filter_fn )
         dataset = dataset.prefetch( num_buffered_elements )
 
-        # Remove input that doesn't fit necessary specifications
-        if filter_fn:
-            dataset = dataset.filter( filter_fn )
-            dataset = dataset.prefetch( num_buffered_elements )
-
-        # Bucket and batch appropriately
-        if boundaries:
-            dataset = dataset.apply( tf.contrib.data.bucket_by_sequence_length(
-                element_length_func=dpipe.element_length_fn,
-                # Create numpy array as follows: [batch_size,...,batch_size]
-                bucket_batch_sizes=np.full( len( boundaries ) + 1, 
-                                            batch_size ),
-                bucket_boundaries=boundaries ) ) 
-        else:
-            # Dynamically pad batches to match largest in batch
-            dataset = dataset.padded_batch( batch_size, 
-                                            padded_shapes=dataset.output_shapes )
-
-        # Update to account for batching
-        num_buffered_elements = num_threads * 2
-        
-        dataset = dataset.prefetch( num_buffered_elements )
-        
-        # Repeat for num_epochs  
-        if num_epochs and static_data:
-            dataset = dataset.repeat( num_epochs )
-        # Repeat indefinitely if no num_epochs is specified
-        elif static_data:
-            dataset = dataset.repeat()
-
-        # Prepare dataset for Estimator ingestion
-        # ie: sparsify labels for CTC operations (eg loss, decoder)
-        # and convert elements to be [features, label]
-        dataset = dataset.map( dpipe.postbatch_fn,
-                               num_parallel_calls=num_threads )
-        dataset = dataset.prefetch( num_buffered_elements )
-        
+    # Bucket and batch appropriately
+    if boundaries:
+        dataset = dataset.apply( tf.contrib.data.bucket_by_sequence_length(
+            element_length_func=dpipe.element_length_fn,
+            # Create numpy array as follows: [batch_size,...,batch_size]
+            bucket_batch_sizes=np.full( len( boundaries ) + 1, 
+                                        batch_size ),
+            bucket_boundaries=boundaries ) ) 
+    else:
+        # Dynamically pad batches to match largest in batch
+        dataset = dataset.padded_batch( batch_size, 
+                                        padded_shapes=dataset.output_shapes )
+    
+    # Update to account for batching
+    num_buffered_elements = num_threads * 2
+    
+    dataset = dataset.prefetch( num_buffered_elements )
+    
+    # Repeat for num_epochs  
+    if num_epochs and static_data:
+        dataset = dataset.repeat( num_epochs )
+    # Repeat indefinitely if no num_epochs is specified
+    elif static_data:
+        dataset = dataset.repeat()
+    
+    # Prepare dataset for Estimator ingestion
+    # ie: sparsify labels for CTC operations (eg loss, decoder)
+    # and convert elements to be [features, label]
+    dataset = dataset.map( dpipe.postbatch_fn,
+                           num_parallel_calls=num_threads )
+    dataset = dataset.prefetch( num_buffered_elements )
+    
     return dataset
 
 

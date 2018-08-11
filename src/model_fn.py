@@ -248,30 +248,28 @@ def _get_output( rnn_logits, sequence_length, lexicon ):
     return predictions, log_prob
 
 
-def train_fn( scope, tune_from, train_device, learning_rate, 
+def train_fn( scope, tune_from, learning_rate, 
                     decay_steps, decay_rate, decay_staircase, momentum ): 
     """Returns a function that trains the model"""
 
     def train( features, labels, mode ):
 
-        with tf.device( train_device ):
-            
-            logits, sequence_length = _get_image_info( features, mode )
+        logits, sequence_length = _get_image_info( features, mode )
 
-            train_op, loss = _get_training( logits,labels,
-                                            sequence_length, 
-                                            scope, learning_rate, 
-                                            decay_steps, decay_rate, 
-                                            decay_staircase, momentum )
-
-            # Initialize weights from a pre-trained model
-            scaffold = tf.train.Scaffold( init_fn=
-                                          _get_init_pretrained( tune_from ) )
-
-            return tf.estimator.EstimatorSpec( mode=mode, 
-                                               loss=loss, 
-                                               train_op=train_op,
-                                               scaffold=scaffold )
+        train_op, loss = _get_training( logits,labels,
+                                        sequence_length, 
+                                        scope, learning_rate, 
+                                        decay_steps, decay_rate, 
+                                        decay_staircase, momentum )
+        
+        # Initialize weights from a pre-trained model
+        scaffold = tf.train.Scaffold( init_fn=
+                                      _get_init_pretrained( tune_from ) )
+        
+        return tf.estimator.EstimatorSpec( mode=mode, 
+                                           loss=loss, 
+                                           train_op=train_op,
+                                           scaffold=scaffold )
     return train
 
 
