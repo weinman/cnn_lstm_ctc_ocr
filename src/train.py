@@ -63,10 +63,15 @@ tf.app.flags.DEFINE_string('filename_pattern','words-*',
                            """File pattern for input data""")
 tf.app.flags.DEFINE_integer('num_input_threads',4,
                           """Number of readers for input data""")
-tf.app.flags.DEFINE_integer('width_threshold',None,
-                            """Limit of input image width""")
-tf.app.flags.DEFINE_integer('length_threshold',None,
-                            """Limit of input string length width""")
+tf.app.flags.DEFINE_integer('min_image_width',None,
+                            """Minimum allowable input image width""")
+tf.app.flags.DEFINE_integer('max_image_width',None,
+                            """Maximum allowable input image width""")
+tf.app.flags.DEFINE_integer('min_string_length',None,
+                            """Minimum allowable input string length""")
+tf.app.flags.DEFINE_integer('max_string_length',None,
+                            """Maximum allowable input string_length""")
+
 
 tf.app.flags.DEFINE_string('synth_config_file','../data/maptextsynth_config.txt',
                            """Location of config file for map text synthesizer""")
@@ -94,9 +99,14 @@ def _get_input():
                 data pipelines respectively
     """
 
-    # We only want a filter_fn if we have dynamic data (for now)
-    filter_fn = None if FLAGS.static_data else filters.dyn_filter_by_width
-
+    # WARNING: More than two filters causes SEVERE throughput slowdown
+    filter_fn = filters.input_filter_fn \
+                ( min_image_width=FLAGS.min_image_width,
+                  max_image_width=FLAGS.max_image_width,
+                  min_string_length=FLAGS.min_string_length,
+                  max_string_length=FLAGS.max_string_length,
+                  static_data=FLAGS.static_data )
+    
     gpu_batch_size = FLAGS.batch_size / FLAGS.num_gpus
     
     # Pack keyword arguments into dictionary
@@ -120,9 +130,9 @@ def _get_input():
 def _get_distribution_strategy():
     """Configure training distribution strategy"""
     
-    if FLAGS.num_gpus == 1:
-        return tf.contrib.distribute.OneDeviceStrategy(device='/gpu:0')
-    elif FLAGS.num_gpus > 1:
+#    if FLAGS.num_gpus == 1: # cannot restore until at least r1.10 (02ae1e2)
+#        return tf.contrib.distribute.OneDeviceStrategy(device='/gpu:0')
+    if FLAGS.num_gpus > 1:
         return tf.contrib.distribute.MirroredStrategy(num_gpus=FLAGS.num_gpus)
     else:
         return None
