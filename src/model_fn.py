@@ -263,11 +263,11 @@ def train_fn( scope, tune_from, learning_rate,
                                         decay_staircase, momentum )
 
         tf.train.init_from_checkpoint(tune_from,
-                                      {'OptimizeLoss/':'OptimizeLoss/',
-                                       'rnn/': 'rnn/',
-                                       'global_step': 'global_step',
-                                       'train/': 'train/',
-                                       'convnet/': 'convnet/'})
+                                      {'/':'/'})#,
+                                       #'/': 'rnn/',
+                                       #'global_step': 'global_step',
+                                       #'/': 'train/',
+                                       #'/': 'convnet/'})
         
         return tf.estimator.EstimatorSpec( mode=mode, 
                                            loss=loss, 
