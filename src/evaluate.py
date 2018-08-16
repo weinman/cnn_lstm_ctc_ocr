@@ -25,6 +25,7 @@ from tensorflow.python.ops import control_flow_ops
 import six
 import model_fn
 import pipeline
+import filters
 
 # Filters out information to just show a stream of results
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -34,11 +35,8 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_integer( 'batch_size',2**9,
                              """Eval batch size""" )
-tf.app.flags.DEFINE_integer('eval_interval_secs', 60,
+tf.app.flags.DEFINE_integer('eval_interval_secs', 120,
                              """Time between test runs""")
-
-tf.app.flags.DEFINE_string( 'device','/gpu:0',
-                            """Device for graph placement""" )
 
 tf.app.flags.DEFINE_string( 'model','../data/model',
                             """Directory for event logs and checkpoints""" )
@@ -55,8 +53,18 @@ tf.app.flags.DEFINE_boolean( 'static_data', True,
                              """Whether to use static data 
                              (false for dynamic data)""" )
 
-#tf.logging.set_verbosity( tf.logging.WARN )
-#tf.logging.set_verbosity( tf.logging.INFO )
+tf.app.flags.DEFINE_integer('min_image_width',None,
+                            """Minimum allowable input image width""")
+tf.app.flags.DEFINE_integer('max_image_width',None,
+                            """Maximum allowable input image width""")
+tf.app.flags.DEFINE_integer('min_string_length',None,
+                            """Minimum allowable input string length""")
+tf.app.flags.DEFINE_integer('max_string_length',None,
+                            """Maximum allowable input string_length""")
+
+tf.app.flags.DEFINE_boolean('bucket_data',False,
+                            """Bucket training data by width for efficiency""")
+
 
 def _get_input():
     """
@@ -73,19 +81,26 @@ def _get_input():
                 data pipelines respectively
     """
 
-    # We only want a filter_fn if we have dynamic data (for now)
-    filter_fn = None if FLAGS.static_data else filters.dyn_filter_by_width
+    # WARNING: More than two filters causes SEVERE throughput slowdown
+    filter_fn = filters.input_filter_fn \
+                ( min_image_width=FLAGS.min_image_width,
+                  max_image_width=FLAGS.max_image_width,
+                  min_string_length=FLAGS.min_string_length,
+                  max_string_length=FLAGS.max_string_length )
+
+    # Pack keyword arguments into dictionary
+    data_args = { 'base_dir': FLAGS.test_path,
+                  'file_patterns': str.split(FLAGS.filename_pattern, ','),
+                  'num_threads': FLAGS.num_input_threads,
+                  'batch_size': FLAGS.batch_size,
+                  'filter_fn': filter_fn
+    }
+
+    if not FLAGS.bucket_data: # Turn off bucketing (on by default in pipeline)
+        data_args['boundaries']=None
 
     # Get data according to flags
-    dataset = pipeline.get_data( FLAGS.static_data,
-                                 base_dir=FLAGS.test_path,
-                                 file_patterns=str.split(
-                                     FLAGS.filename_pattern,
-                                     ','),
-                                 num_threads=FLAGS.num_input_threads,
-                                 batch_size=FLAGS.batch_size,
-                                 input_device=FLAGS.device,
-                                 filter_fn=filter_fn )
+    dataset = pipeline.get_data( FLAGS.static_data, **data_args)
 
     return dataset
 
@@ -128,7 +143,7 @@ def main(argv=None):
     features, labels = iterator.get_next()
 
     # Construct the evaluation function 
-    evaluate_fn = model_fn.evaluate_fn(FLAGS.device)
+    evaluate_fn = model_fn.evaluate_fn()
 
     # Wrap the ops in an Estimator spec object
     estimator_spec = evaluate_fn(features, labels, 

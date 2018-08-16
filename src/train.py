@@ -104,8 +104,7 @@ def _get_input():
                 ( min_image_width=FLAGS.min_image_width,
                   max_image_width=FLAGS.max_image_width,
                   min_string_length=FLAGS.min_string_length,
-                  max_string_length=FLAGS.max_string_length,
-                  static_data=FLAGS.static_data )
+                  max_string_length=FLAGS.max_string_length )
     
     gpu_batch_size = FLAGS.batch_size / FLAGS.num_gpus
     

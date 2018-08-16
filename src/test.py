@@ -28,25 +28,31 @@ tf.app.flags.DEFINE_string( 'model','../data/model',
 
 tf.app.flags.DEFINE_integer( 'batch_size',2**9,
                              """Eval batch size""" )
-tf.app.flags.DEFINE_string( 'device','/gpu:0',
-                            """Device for graph placement""" )
 tf.app.flags.DEFINE_string( 'test_path','../data/',
                             """Base directory for test/validation data""" )
 
-tf.app.flags.DEFINE_string( 'filename_pattern','val/words-*',
+tf.app.flags.DEFINE_string( 'filename_pattern','test/words-*',
                             """File pattern for test input data""" )
 tf.app.flags.DEFINE_integer( 'num_input_threads',4,
                              """Number of readers for input data""" )
 tf.app.flags.DEFINE_boolean( 'static_data', True,
                             """Whether to use static data 
                             (false for dynamic data)""" )
+
+tf.app.flags.DEFINE_integer('min_image_width',None,
+                            """Minimum allowable input image width""")
+tf.app.flags.DEFINE_integer('max_image_width',None,
+                            """Maximum allowable input image width""")
+tf.app.flags.DEFINE_integer('min_string_length',None,
+                            """Minimum allowable input string length""")
+tf.app.flags.DEFINE_integer('max_string_length',None,
+                            """Maximum allowable input string_length""")
+
 tf.app.flags.DEFINE_string('synth_config_file','../data/maptextsynth_config.txt',
                            """Location of config file for map text synthesizer""")
 tf.app.flags.DEFINE_string('synth_lexicon_file','../data/lexicon.txt',
                            """Location of synth lexicon""")
 
-#tf.logging.set_verbosity( tf.logging.WARN )
-#tf.logging.set_verbosity( tf.logging.INFO )
 
 def _get_input():
     """
@@ -59,8 +65,12 @@ def _get_input():
                 data pipelines respectively
     """
 
-    # We only want a filter_fn if we have dynamic data (for now)
-    filter_fn = None if FLAGS.static_data else filters.dyn_filter_by_width
+    # WARNING: More than two filters causes SEVERE throughput slowdown
+    filter_fn = filters.input_filter_fn \
+                ( min_image_width=FLAGS.min_image_width,
+                  max_image_width=FLAGS.max_image_width,
+                  min_string_length=FLAGS.min_string_length,
+                  max_string_length=FLAGS.max_string_length )
 
     # Get data according to flags
     dataset = pipeline.get_data( FLAGS.static_data,
@@ -70,7 +80,6 @@ def _get_input():
                                      ','),
                                  num_threads=FLAGS.num_input_threads,
                                  batch_size=FLAGS.batch_size,
-                                 input_device=FLAGS.device,
                                  filter_fn=filter_fn,
                                  synth_config_file=FLAGS.synth_config_file,
                                  synth_lexicon_file=FLAGS.synth_lexicon_file,
@@ -94,8 +103,7 @@ def main(argv=None):
   
     # Initialize the classifier
     classifier = tf.estimator.Estimator( config = _get_config(),
-                                         model_fn=model_fn.evaluate_fn(
-                                             FLAGS.device ), 
+                                         model_fn=model_fn.evaluate_fn(), 
                                          model_dir=FLAGS.model,
                                          params={'continuous_eval': False} )
     

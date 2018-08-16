@@ -46,9 +46,8 @@ def get_data( static_data,
     Returns:
       dataset : tf.data.Dataset object.
                 elements structured as [features, labels]
-                feature structure can be seen in postbatch_fn 
-                in mjsynth.py or maptextsynth.py for static or dynamic
-                data pipelines respectively
+                Example feature structure can be seen in postbatch_fn 
+                in mjsynth.py
     """    
     # Elements to be buffered
     num_buffered_elements = num_threads * batch_size * 2
