@@ -261,15 +261,17 @@ def train_fn( scope, tune_from, learning_rate,
                                         scope, learning_rate, 
                                         decay_steps, decay_rate, 
                                         decay_staircase, momentum )
-        
-        # Initialize weights from a pre-trained model
-        scaffold = tf.train.Scaffold( init_fn=
-                                      _get_init_pretrained( tune_from ) )
+
+        tf.train.init_from_checkpoint(tune_from,
+                                      {'/':'/'})#,
+                                       #'/': 'rnn/',
+                                       #'global_step': 'global_step',
+                                       #'/': 'train/',
+                                       #'/': 'convnet/'})
         
         return tf.estimator.EstimatorSpec( mode=mode, 
                                            loss=loss, 
-                                           train_op=train_op,
-                                           scaffold=scaffold )
+                                           train_op=train_op )
     return train
 
 
