@@ -91,18 +91,17 @@ def preprocess_fn( data ):
     label = tf.serialize_sparse( features['image/labels'] ) # for batching
     length = features['text/length']
     text = features['text/string']
-    filename = features['image/filename']
 
     image = preprocess_image( image )
 
-    return image, width, label, length, text, filename
+    return image, width, label, length, text
 
 
-def element_length_fn( image, width, label, length, text, filename ):
+def element_length_fn( image, width, label, length, text ):
     return width
 
 
-def postbatch_fn( image, width, label, length, text, filename ):
+def postbatch_fn( image, width, label, length, text ):
     # Batching complete, so now we can re-sparsify our labels for ctc_loss
     label = tf.cast( tf.deserialize_many_sparse( label, tf.int64 ),
                      tf.int32 )
@@ -112,8 +111,7 @@ def postbatch_fn( image, width, label, length, text, filename ):
         "image"    : image, 
         "width"    : width,
         "length"   : length,
-        "text"     : text,
-        "filename" : filename,
+        "text"     : text
     }
 
     return features, label

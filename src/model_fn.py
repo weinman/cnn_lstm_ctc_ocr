@@ -273,92 +273,91 @@ def train_fn( scope, tune_from, learning_rate,
     return train
 
 
-def evaluate_fn( device ):
+def evaluate_fn( ):
     """Returns a function that evaluates the model for all batches at once or 
     continuously for one batch"""
 
     def evaluate( features, labels, mode, params ):
                 
-        with tf.device( device ): 
-            logits, sequence_length = _get_image_info( features, mode )
+        logits, sequence_length = _get_image_info( features, mode )
 
-            continuous_eval = params['continuous_eval']
-            length = features['length']
+        continuous_eval = params['continuous_eval']
+        length = features['length']
             
-            # Get the predictions
-            loss,\
-                batch_label_error,\
-                batch_sequence_error, \
-                batch_total_labels, \
-                _ = _get_testing( logits,sequence_length,labels,
-                                  length )
-
-            # Getting the mean label errors
-            mean_label_error, \
-                update_op_label, \
-                total_num_label_errors, \
-                total_num_labels= _get_label_err_ops( batch_label_error, 
-                                                      batch_total_labels )
+        # Get the predictions
+        loss,\
+            batch_label_error,\
+            batch_sequence_error, \
+            batch_total_labels, \
+            _ = _get_testing( logits,sequence_length,labels,
+                              length )
+        
+        # Getting the mean label errors
+        mean_label_error, \
+            update_op_label, \
+            total_num_label_errors, \
+            total_num_labels= _get_label_err_ops( batch_label_error, 
+                                                  batch_total_labels )
+        
+        #Getting the mean sequence errors
+        mean_sequence_error,\
+            update_op_seq,\
+            total_num_sequence_errs,\
+            total_num_sequences= _get_seq_err_ops( batch_sequence_error, 
+                                                   length )
+        
+        # Print the metrics while doing continuous evaluation (evaluate.py) 
+        # Note: tf.Print is identical to tf.identity, except it prints
+        # the list of metrics as a side effect
+        if (continuous_eval):
+            global_step = tf.train.get_or_create_global_step()
+            mean_sequence_error = tf.Print( mean_sequence_error, 
+                                            [global_step,
+                                             loss,
+                                             mean_label_error,
+                                             mean_sequence_error] ,
+                                            first_n=1)
             
-            #Getting the mean sequence errors
-            mean_sequence_error,\
-                update_op_seq,\
-                total_num_sequence_errs,\
-                total_num_sequences= _get_seq_err_ops( batch_sequence_error, 
-                                                       length )
             
-            # Print the metrics while doing continuous evaluation (evaluate.py) 
-            # Note: tf.Print is identical to tf.identity, except it prints
-            # the list of metrics as a side effect
-            if (continuous_eval):
-                global_step = tf.train.get_or_create_global_step()
-                mean_sequence_error = tf.Print( mean_sequence_error, 
-                                                [global_step,
-                                                 loss,
-                                                 mean_label_error,
-                                                 mean_sequence_error] ,
-                                                first_n=1)
-                
-                
-
-                # Create summaries for the approprite metrics during continous 
-                #eval
-                tf.summary.scalar( 'evaluation_loss', tensor=loss,
-                                   family='continuous evaluation' )
-                tf.summary.scalar( 'mean_label_error', tensor=mean_label_error,
-                                   family='continuous evaluation' )
-                tf.summary.scalar( 'mean_sequence_error',
-                                   tensor=mean_sequence_error,
-                                   family='continuous evaluation' )
-   
-            # Convert to tensor in order to pass it to eval_metric_ops
-            total_num_label_errors = tf.convert_to_tensor(
-                total_num_label_errors)
-            total_num_labels = tf.convert_to_tensor(
-                total_num_labels)
-            total_num_sequence_errs = tf.convert_to_tensor(
-                total_num_sequence_errs)
-            total_num_sequences = tf.convert_to_tensor(
-                total_num_sequences)
             
-            # All the eval_metric_ops that will be passed on to the 
-            # EstimatorSpec object
-            eval_metric_ops = {
-                'mean_label_error': ( mean_label_error, update_op_label ),
-                'mean_sequence_error': ( mean_sequence_error, update_op_seq ),
-                'total_num_label_errors': ( total_num_label_errors, tf.no_op() ),
-                'total_num_labels':( total_num_labels, tf.no_op() ),
-                'total_num_sequence_errs': ( total_num_sequence_errs, tf.no_op() ),
-                'total_num_sequences': ( total_num_sequences, tf.no_op() ) 
-            }
+            # Create summaries for the approprite metrics during continous 
+            #eval
+            tf.summary.scalar( 'loss', tensor=loss,
+                               family='test' )
+            tf.summary.scalar( 'label_error', tensor=mean_label_error,
+                               family='test' )
+            tf.summary.scalar( 'sequence_error',
+                               tensor=mean_sequence_error,
+                               family='test' )
             
-            return tf.estimator.EstimatorSpec( mode=mode, 
-                                               loss=loss, 
-                                               eval_metric_ops=eval_metric_ops )
+        # Convert to tensor in order to pass it to eval_metric_ops
+        total_num_label_errors = tf.convert_to_tensor(
+            total_num_label_errors)
+        total_num_labels = tf.convert_to_tensor(
+            total_num_labels)
+        total_num_sequence_errs = tf.convert_to_tensor(
+            total_num_sequence_errs)
+        total_num_sequences = tf.convert_to_tensor(
+            total_num_sequences)
+            
+        # All the eval_metric_ops that will be passed on to the 
+        # EstimatorSpec object
+        eval_metric_ops = {
+            'mean_label_error': ( mean_label_error, update_op_label ),
+            'mean_sequence_error': ( mean_sequence_error, update_op_seq ),
+            'total_num_label_errors': ( total_num_label_errors, tf.no_op() ),
+            'total_num_labels':( total_num_labels, tf.no_op() ),
+            'total_num_sequence_errs': ( total_num_sequence_errs, tf.no_op() ),
+            'total_num_sequences': ( total_num_sequences, tf.no_op() ) 
+        }
+        
+        return tf.estimator.EstimatorSpec( mode=mode, 
+                                           loss=loss, 
+                                           eval_metric_ops=eval_metric_ops )
     return evaluate
 
 
-def predict_fn( device, lexicon ):
+def predict_fn( lexicon ):
     """Returns a function that validates the input data"""
 
     def predict( features, labels, mode ):
@@ -374,17 +373,16 @@ def predict_fn( device, lexicon ):
         # Pack the modified image data into a dictionary
         proc_img_data = {'image': proc_image, 'width': width}
 
-        with tf.device( device ):
-            logits, sequence_length = _get_image_info(proc_img_data, mode)
-
-            prediction, log_prob = _get_output( logits,sequence_length, lexicon )
-
-            # predictions only takes dense tensors
-            final_pred = tf.sparse_to_dense( prediction[0].indices, 
-                                             prediction[0].dense_shape, 
-                                             prediction[0].values, 
-                                             default_value=0 ) 
-
+        logits, sequence_length = _get_image_info(proc_img_data, mode)
+        
+        prediction, log_prob = _get_output( logits,sequence_length, lexicon )
+        
+        # predictions only takes dense tensors
+        final_pred = tf.sparse_to_dense( prediction[0].indices, 
+                                         prediction[0].dense_shape, 
+                                         prediction[0].values, 
+                                         default_value=0 ) 
+        
         return tf.estimator.EstimatorSpec( mode=mode,
                                            predictions={ 'labels': final_pred,
                                                          'score': log_prob })
