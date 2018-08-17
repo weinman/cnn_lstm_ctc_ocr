@@ -262,12 +262,8 @@ def train_fn( scope, tune_from, learning_rate,
                                         decay_steps, decay_rate, 
                                         decay_staircase, momentum )
 
-        tf.train.init_from_checkpoint(tune_from,
-                                      {'/':'/'})#,
-                                       #'/': 'rnn/',
-                                       #'global_step': 'global_step',
-                                       #'/': 'train/',
-                                       #'/': 'convnet/'})
+        # Initialize identical model from specified checkpoint
+        tf.train.init_from_checkpoint( tune_from, {'/':'/'} )
         
         return tf.estimator.EstimatorSpec( mode=mode, 
                                            loss=loss, 
