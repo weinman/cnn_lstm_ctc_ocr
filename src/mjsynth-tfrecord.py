@@ -36,7 +36,7 @@ out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 jpeg_data = tf.placeholder( dtype=tf.string )
 jpeg_decoder = tf.image.decode_jpeg( jpeg_data,channels=1 )
 
-kernel_sizes = [5,5,3,3,3,3] # CNN kernels for image reduction
+kernel_sizes = [3,3,3,3,3,3] # CNN kernels for image reduction
 
 # Minimum allowable width of image after CNN processing
 min_width = 20
@@ -48,11 +48,11 @@ def calc_seq_len( image_width ):
     fc6_trim = 2 * (kernel_sizes[5] // 2)
     
     after_conv1 = image_width - conv1_trim 
-    after_pool1 = after_conv1 // 2
-    after_pool2 = after_pool1 // 2
+    after_pool2 = after_conv1 // 2
     after_pool4 = after_pool2 - 1 # max without stride
-    after_fc6 =  after_pool4 - fc6_trim
-    seq_len = 2 * after_fc6
+    after_pool6 = after_pool4 - 1
+    after_pool8 = after_pool6
+    seq_len = after_pool8
     return seq_len
 
 seq_lens = [calc_seq_len( w ) for w in range( 1024 )]
