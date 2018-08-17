@@ -116,13 +116,23 @@ Relevant code for MTS (MapTextSynthesizer) can be found within the following dir
 ```
 git clone https://github.com/niehusst/MapTextSynthesizer.git
 cd ./MapTextSynthesizer
+make static
 export PKG_CONFIG_PATH=`pwd`
 cd ./tensorflow/generator/
 make lib
-export PYTHONPATH=`pwd`
+export PYTHONPATH=$PYTHONPATH:`pwd`
+export PATH=$PATH:`pwd`/ipc_synth
+export OPENCV_OPENCL_RUNTIME=null
+export OPENCV_OPENCL_DEVICE=disabled
 ```
-If these steps are completed successfully, then train.py --static_data=False should run successfully.  
+* `OPENCV_*` environmental variables are specified to prevent OPENCV from trying to use GPU when converting image from 4 channels to 1 channel. 
+* `PYTHONPATH` is specified so that maptextsynth.py can be found when importing from pipeline.py.
+* `PATH` is specified so that `producer` and `base` can be found when `execvp`'ing for IPC multithreaded synthesis.
+
+If these steps are completed successfully, then train.py --static_data=False should run successfully. You should see `Failed to load OpenCL runtime` `num_producers` times. This is good, and means that cv isn't taking GPU for no good reason.   
 Additional configuration options to keep in mind with dynamic data:
-* The synthesizer's lexicon file, config file, and font(?) file can be specified via runtime flags. Use the `--help` flag for more information.
+* The synthesizer's config file can be specified using runtime flags. Use the `--help` flag for more information. Also more information can be found in the README.md of the MapTextSynthesizer repository.
 
-
+# IPC Specific Things-to-know
+* Once you're done using IPC, you can cleanup the shared memory and semaphores by running `mts_ipc_cleanup`. This is located in `/path/to/MapTextSyntheser/tensorflow/generator/ipc_synth/`, so if your path is configured appropriately you can just type the command.
+* If you haven't gotten a global step in a while, and you notice that your CPU usage for the `python` tensorflow process is consistently stuck at 100 via `top`, then it's likely that the consumer is stuck, which is likely the result of some sort of race condition I (@gaffordb) haven't accounted for. Or just check to see if something killed your `producer` processes. 
