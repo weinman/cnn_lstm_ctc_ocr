@@ -27,8 +27,7 @@ def get_data( static_data,
               boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
               num_epochs=None,
               filter_fn=None,
-              synth_config_file=None,
-              synth_lexicon_file=None ):
+              synth_config_file=None ):
     """Get Dataset according to parameters
     Parameters:
       static_data   : boolean for whether to use static or dynamic data
@@ -65,7 +64,7 @@ def get_data( static_data,
         # for more usage instructions if relevant
         import maptextsynth as dpipe
         dpipe_args = ( synth_config_file,
-                       synth_lexicon_file )
+                       num_threads )
 
     # Get raw data
     dataset = dpipe.get_dataset( dpipe_args )
