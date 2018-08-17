@@ -1,0 +1,373 @@
+Abel
+Abhaya Libre
+Abhaya Libre Medium
+Abyssinica SIL
+Adamina
+Advent Pro
+Alegreya
+Alegreya Sans
+Alice
+Alike
+Alike Angular
+Allan
+Almendra
+Amethysta
+Amiri
+Amita
+AmstelvarAlpha
+Anaheim
+Andada
+Anonymous Pro
+Antic
+Antic Didone
+Antic Slab
+Arapey
+Arbutus Slab
+Architects Daughter
+Archivo
+Archivo Narrow
+Aref Ruqaa
+Arima Madurai
+Arsenal
+Arya
+Asap Condensed VF Beta
+Asar
+Assistant
+Asul
+Athiti
+Atma
+Aubrey
+Autour One
+Average
+Averia Gruesa Libre
+Averia Libre
+Averia Sans Libre
+Balthazar
+Barlow
+Barlow Condensed
+Barlow Semi Condensed
+Belgrano
+Bellefair
+Belleza
+Bentham
+BioRhyme
+BioRhyme Expanded
+Bitter
+Brawler
+Bree Serif
+Bubbler One
+Buda
+Buenard
+Cagliostro
+Cairo
+Cambo
+Cardo
+Carrois Gothic
+Catamaran
+Caudex
+Caveat
+Century Schoolbook L
+cmr10
+Coda
+Comfortaa
+Copse
+Corben
+Cormorant
+Cormorant Garamond
+Cormorant Infant
+Cormorant Upright
+Coustard
+Crete Round
+Crimson Text
+Cuprum
+Cutive Mono
+DejaVu Serif
+Delius
+Della Respira
+Didact Gothic
+Domine
+Donegal One
+Doppio One
+Dosis
+Duru Sans
+EB Garamond
+Eczar
+Ek Mukta
+Electrolize
+El Messiri
+Englebert
+Enriqueta
+Esteban
+Expletus Sans
+Fanwood Text
+Farsan
+Fauna One
+Faustina
+Faustina VF Beta
+Fenix
+Fjord
+Flamenco
+Forum
+Frank Ruhl Libre
+Fresca
+Gafata
+Galdeano
+Gamja Flower
+Gemunu Libre
+Gemunu Libre ExtraLight
+Gemunu Libre Light
+Gemunu Libre Medium
+Gentium Basic
+Gentium Book Basic
+GFS Didot
+GFS Neohellenic
+Gidugu
+Gilda Display
+Glass Antiqua
+Glegoo
+Goudy Bookletter 1911
+Gruppo
+Gurajada
+Habibi
+Halant
+Handlee
+Happy Monkey
+Harmattan
+HeadlandOne
+Hermeneus One
+Homenaje
+IBM Plex Mono
+IBM Plex Serif
+IM FELL Double Pica
+IM FELL DW Pica
+IM FELL English
+IM FELL French Canon
+IM FELL Great Primer
+Imprima
+Inconsolata
+Inika
+Inknut Antiqua
+Italiana
+Itim
+Jacques Francois
+JejuMyeongjo
+Jomolhari
+Josefin Sans Std
+Josefin Slab
+jsMath-cmr10
+jsMath-cmti10
+Judson
+Junge
+Jura
+Just Another Hand
+Kadwa
+Kameron
+Kanit
+Karla
+Karma
+Kavivanar
+Kelly Slab
+Khand
+Kite One
+KoPub Batang
+Kotta One
+Kreon
+Kurale
+Laila
+Lancelot
+Lateef
+Latin Modern Mono
+Latin Modern Mono Light
+Latin Modern Mono Light Cond
+Latin Modern Mono Prop
+Latin Modern Mono Prop Light
+Latin Modern Mono Slanted
+Latin Modern Roman Dunhill
+Latin Modern Roman Slanted
+Latin Modern Roman Unslanted
+Latin Modern Sans
+Latin Modern Sans Demi Cond
+Latin Modern Sans Quotation
+Ledger
+Lekton
+Lemonada
+Liberation Sans Narrow
+Liberation Serif
+Libre Baskerville
+Libre Caslon Text
+Life Savers
+Linden Hill
+Lora
+Love Ya Like A Sister
+Lusitana
+Lustria
+Macondo
+Macondo Swash Caps
+Mada
+Magra
+Maiden Orange
+Maitree
+Mallanna
+Manuale
+Marcellus
+Margarine
+Markazi Text
+Marmelad
+Martel
+Marvel
+Mate
+MathJax_Main
+MathJax_Typewriter
+McLaren
+Merienda
+Merriweather
+Mina
+Miriam Libre
+Mirza
+Mitr
+Montaga
+Montserrat
+Montserrat Alternates
+Nanum Brush Script
+NanumGothic
+NanumGothicCoding
+NanumMyeongjo
+Nanum Pen
+NATS
+Neucha
+Neuton
+News Cycle
+Nimbus Mono L
+Nimbus Roman No9 L
+NovaMono
+Nova Round
+Nova Slim
+Nova Square
+NTR
+Offside
+OFL Sorts Mill Goudy TT
+Oldenburg
+Old Standard TT
+Oranienbaum
+Oregano
+Orienta
+Original Surfer
+Oswald
+Overlock
+Overpass
+Ovo
+Pangolin
+Paprika
+Pathway Gothic One
+Patrick Hand
+Pavanam
+Peddana
+Petrona
+Philosopher
+Playfair Display
+Podkova
+Podkova VF Beta
+Poly
+Pompiere 
+Pontano Sans
+Poor Story
+Port Lligat Sans
+Port Lligat Slab
+Post No Bills Colombo
+Prata
+Pridi
+Prociono
+PT Mono
+PT Sans
+Puritan
+Quando
+Quantico
+Quattrocento
+Quattrocento Sans
+Questrial
+Quicksand
+Radley
+Rajdhani
+Ramaraja
+Rancho
+Ranga
+Rasa
+Rationale
+Ravi Prakash
+Redressed
+Reem Kufi
+Rhodium Libre
+Rokkitt
+Rosarivo
+Rozha One
+Rufina
+Ruluko
+Sahitya
+Sanchez
+Sans
+Sansation
+Sarabun
+Sarpanch
+Sawarabi Mincho
+Scheherazade
+Schoolbell
+Scope One
+Sedan
+Sedgwick Ave
+SeoulHangang
+Serif
+Shadows Into Light Two
+Share
+Short Stack
+Simonetta
+Single Day
+Slabo 13px
+Slabo 27px
+Smokum
+Smythe
+Sniglet
+Snippet
+Sofadi One
+Song Myung
+Sorts Mill Goudy
+Source Code Pro
+Special Elite
+Spectral
+Sree Krushnadevaraya
+Sriracha
+Stoke
+Strait
+Strong
+Stylish
+Sue Ellen Francisco 
+Sumana
+Sura
+Suranna
+Suravaram
+Taviraj
+Teko
+Tenali Ramakrishna
+Tenor Sans
+Thabit
+Tienne
+Tillana
+Tinos
+Titillium Web
+Trirong
+Trocchi
+Trykker
+Ubuntu Mono
+Underdog
+Unna
+URW Bookman L
+URW Gothic L
+URW Palladio L
+Vesper Libre
+Vollkorn
+Voltaire
+Wellfleet
+Work Sans
+Yaldevi Colombo
+Yanone Kaffeesatz
+Yrsa
+Zilla Slab

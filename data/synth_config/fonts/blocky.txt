@@ -1,0 +1,138 @@
+Abhaya Libre ExtraBold
+Abhaya Libre SemiBold
+Abril Fatface
+Acme
+Alfa Slab One
+Allerta
+Allerta Stencil
+Amarante
+Amaranth
+Anton
+Antonio
+Archivo Black
+Artifika
+Arvo
+Asset
+Atomic Age
+Averia Serif Libre
+Basic
+Berkshire Swash
+Bigshot One
+BM HANNA_TTF
+Boogaloo
+Bubblegum Sans
+Cantata One
+CantoraOne
+Capriola
+Chicle
+Chivo
+Chonburi
+Chromaletter
+Croissant One
+Diplomata
+Eagle Lake
+Elsie
+Elsie Swash Caps
+Emblema One
+eufm10
+Federant
+Federo
+Fjalla One
+Fondamento
+Francois One
+Fredericka the Great
+Fugaz One
+Gabriela
+Galada
+Galindo
+Gemunu Libre ExtraBold
+Gemunu Libre SemiBold
+Germania One
+Goblin One
+Gorditas
+Gravitas One
+HammersmithOne
+Jaldi
+Jockey One
+Jomhuria
+jsMath-cmbx10
+Katibeh
+Kavoon
+Krona One
+Kumar One
+Lakki Reddy
+Lalezar
+Latin Modern Roman Demi
+Lilita One
+Limelight
+Londrina Solid
+Marko One
+MathJax_Fraktur
+MedievalSharp
+Medula One
+Merienda One
+Metamorphous
+Michroma
+Milonga
+Miltonian Tattoo
+Modern Antiqua
+Mogra
+Mouse Memoirs
+Mplus 1p Bold
+New Rocker
+Nico Moji
+Nova Cut
+Nova Flat
+Oleo Script
+Oleo Script Swash Caps
+Passero One
+Passion One
+Pattaya
+Patua One
+Paytone One
+Peralta
+Piedra
+Pirata One
+Plaster
+PoetsenOne
+Poller One
+Post No Bills Colombo ExtraBold
+Prosto One
+Purple Purse
+Racing Sans One
+Rakkas
+Rammetto One
+Ranchers
+Revalia
+Ribeye
+Righteous
+Risque
+Rum Raisin
+Russo One
+Rye
+Salsa
+Sancreek
+Sansita One
+Seymour One
+Shrikhand
+Skranji
+Slackey
+Sonsie One
+Spicy Rice
+Squada One
+Stalinist One
+Stardos Stencil
+Suez One
+Sunflower
+Supermercado
+Timmana
+Tuffy
+Uncial Antiqua
+UnifrakturCook
+UnifrakturMaguntia
+Unlock
+Vidaloka 
+Viga
+Volkhov
+Yatra One
+Yeseva One
