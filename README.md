@@ -122,13 +122,14 @@ cd ./tensorflow/generator/
 make lib
 export PYTHONPATH=$PYTHONPATH:`pwd`
 export PATH=$PATH:`pwd`/ipc_synth
+export MTS_IPC=`pwd`/ipc_synth
 export OPENCV_OPENCL_RUNTIME=null
 export OPENCV_OPENCL_DEVICE=disabled
 ```
 * `OPENCV_*` environmental variables are specified to prevent OPENCV from trying to use GPU when converting image from 4 channels to 1 channel. 
 * `PYTHONPATH` is specified so that maptextsynth.py can be found when importing from pipeline.py.
 * `PATH` is specified so that `producer` and `base` can be found when `execvp`'ing for IPC multithreaded synthesis.
-
+* `MTS_IPC` is to get a pathname for unique IPC keygen
 If these steps are completed successfully, then train.py --static_data=False should run successfully. You should see `Failed to load OpenCL runtime` `num_producers` times. This is good, and means that cv isn't taking GPU for no good reason.   
 Additional configuration options to keep in mind with dynamic data:
 * The synthesizer's config file can be specified using runtime flags. Use the `--help` flag for more information. Also more information can be found in the README.md of the MapTextSynthesizer repository.
