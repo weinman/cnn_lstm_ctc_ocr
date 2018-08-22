@@ -121,16 +121,17 @@ def get_sequence_lengths( widths ):
     """Calculate resulting sequence length from original image widths"""
     kernel_sizes = [params[1] for params in layer_params]
 
-    conv1_trim = tf.constant( 2 * (kernel_sizes[0] // 2),
-                              dtype=tf.int32,
-                              name='conv1_trim' )
-    one = tf.constant( 1, dtype=tf.int32, name='one' )
-    two = tf.constant( 2, dtype=tf.int32, name='two' )
-    after_conv1 = tf.subtract( widths, conv1_trim )
-    after_pool2 = tf.floor_div( after_conv1, two )
-    after_pool4 = tf.subtract( after_pool2, one )
-    after_pool6 = tf.subtract( after_pool4, one ) 
-    after_pool8 = after_pool6
+    with tf.variable_scope("sequence_length"):
+        conv1_trim = tf.constant( 2 * (kernel_sizes[0] // 2),
+                                  dtype=tf.int32,
+                                  name='conv1_trim' )
+        one = tf.constant( 1, dtype=tf.int32, name='one' )
+        two = tf.constant( 2, dtype=tf.int32, name='two' )
+        after_conv1 = tf.subtract( widths, conv1_trim, name='after_conv1' )
+        after_pool2 = tf.floor_div( after_conv1, two, name='after_pool2' )
+        after_pool4 = tf.subtract( after_pool2, one, name='after_pool4' )
+        after_pool6 = tf.subtract( after_pool4, one, name='after_pool6' ) 
+        after_pool8 = tf.identity( after_pool6, name='after_pool8' )
     return after_pool8
 
 
