@@ -117,7 +117,7 @@ def _get_filter(width, length, min_width, max_width, min_length, max_length,
     if check_input:
         keep_input = add_filter(
             keep_input,
-            tf.greater_equal( tf.cast(length,tf.int32),
+            tf.less_equal( tf.cast(length,tf.int32),
                               model.get_sequence_lengths(width) ) )
         
     if keep_input!=None:
