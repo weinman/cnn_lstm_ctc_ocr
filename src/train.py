@@ -102,7 +102,8 @@ def _get_input():
                 ( min_image_width=FLAGS.min_image_width,
                   max_image_width=FLAGS.max_image_width,
                   min_string_length=FLAGS.min_string_length,
-                  max_string_length=FLAGS.max_string_length )
+                  max_string_length=FLAGS.max_string_length,
+                  check_input=(not FLAGS.static_data))
     
     gpu_batch_size = FLAGS.batch_size / FLAGS.num_gpus
     
@@ -117,6 +118,9 @@ def _get_input():
 
     if not FLAGS.bucket_data:
         data_args['boundaries']=None # Turn off bucketing (on by default)
+    elif not FLAGS.static_data:
+        data_args['boundaries']=[32, 64, 96, 128, 160, 192, 224, 256,
+                                 288, 320, 352, 384, 416, 448, 480, 512]
         
     # Get data according to flags
     dataset = pipeline.get_data( FLAGS.static_data, **data_args)

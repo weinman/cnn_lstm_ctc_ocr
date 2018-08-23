@@ -41,7 +41,8 @@ import tensorflow as tf
 import model
 
 def input_filter_fn( min_image_width=None, max_image_width=None,
-                     min_string_length=None, max_string_length=None):
+                     min_string_length=None, max_string_length=None,
+                     check_input=False):
     """Functor for filter based on string or image size
     Input:
       min_image_width  : Python numerical value (or None) representing the 
@@ -52,24 +53,28 @@ def input_filter_fn( min_image_width=None, max_image_width=None,
                          minimum allowable input string length
       max_string_length : Python numerical value (or None) representing the 
                          maximum allowable input string length
+      check_input: Whether to verify the feature sequence is as long as the 
+                    input string
    Returns:
       keep_input : Boolean Tensor indicating whether to keep a given input 
                   with the specified image width and string length
     """
 
     if not (min_image_width or max_image_width or
-            min_string_length or max_string_length):
+            min_string_length or max_string_length or check_input):
         return None
     
     filter_fn = lambda image, width, label, length, text: \
                 _get_filter( width, length,
                              min_image_width, max_image_width,
-                             min_string_length, max_string_length)
+                             min_string_length, max_string_length,
+                             check_input)
 
     return filter_fn
 
 
-def _get_filter(width, length, min_width, max_width, min_length, max_length):
+def _get_filter(width, length, min_width, max_width, min_length, max_length,
+                check_input):
     """Function for filter based on string or image size
     Input:
       width      : Tensor representing the image width
@@ -82,6 +87,8 @@ def _get_filter(width, length, min_width, max_width, min_length, max_length):
                      minimum allowable input string length
       max_length : Python numerical value (or None) representing the 
                      maximum allowable input string length
+      check_input: Whether to verify the feature sequence is as long as the 
+                    input string
    Returns:
       keep_input : Boolean Tensor indicating whether to keep a given input 
                      with the specified image width and string length
@@ -107,6 +114,11 @@ def _get_filter(width, length, min_width, max_width, min_length, max_length):
     if max_length:
         keep_input = add_filter( keep_input,
                                 tf.less_equal(length, max_length) )
+    if check_input:
+        keep_input = add_filter(
+            keep_input,
+            tf.greater_equal( tf.cast(length,tf.int32),
+                              model.get_sequence_lengths(width) ) )
         
     if keep_input!=None:
         keep_input = tf.reshape( keep_input, [] ) # explicitly make a scalar
