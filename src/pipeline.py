@@ -65,6 +65,13 @@ def get_data( static_data,
         # for more usage instructions if relevant
         import maptextsynth as dpipe
 
+        # Ensure synth_config_file is specified
+        if not synth_config_file:
+            print 'Dynamic data pipeline requires synth_config_file.'
+            print 'Please specify a `synth_config_file` using the runtime flag.'
+            print 'Use --help flag for more info.'
+            exit()
+            
         # 0 producers passed into generator uses
         # single threaded nonbuffered synth
         num_producers = num_threads if ipc_synth else 0

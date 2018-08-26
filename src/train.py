@@ -74,7 +74,7 @@ tf.app.flags.DEFINE_integer('max_string_length',None,
 
 
 tf.app.flags.DEFINE_string('synth_config_file',
-                           '../data/synth_config/maptextsynth_config.txt',
+                           None,
                            """Location of config file for map text synthesizer""")
 tf.app.flags.DEFINE_boolean('ipc_synth',True,
                             """Use IPC synth for buffered 
