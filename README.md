@@ -108,6 +108,10 @@ configurable and need to be edited in the code (see `model.py`).
 
 Dynamic data can be used for training or testing by setting the `--static_data` flag to False.  
 
+You can use the `ipc_synth` boolean flag to determine whether to use single-threaded synthesis or buffered IPC multithreaded synthesis.  
+
+You **_must_** specify `synth_config_file` in order to get dynamic data synthesis.  
+
 Dynamic data is synthesized using the MapTextSynthesizer created by Ziwen Chen and Liam Niehus-Staab. The repository is located at: https://github.com/niehusst/MapTextSynthesizer  
 
 Relevant code for MTS (MapTextSynthesizer) can be found within the following directory in the MTS repository: MapTextSynthesizer/tensorflow/generator
