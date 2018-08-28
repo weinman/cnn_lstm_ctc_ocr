@@ -48,8 +48,12 @@ tf.app.flags.DEFINE_integer('min_string_length',None,
 tf.app.flags.DEFINE_integer('max_string_length',None,
                             """Maximum allowable input string_length""")
 
-tf.app.flags.DEFINE_string('synth_config_file','../data/synth_config/maptextsynth_config.txt',
+tf.app.flags.DEFINE_string('synth_config_file',
+                           None,
                            """Location of config file for map text synthesizer""")
+tf.app.flags.DEFINE_boolean('ipc_synth',True,
+                            """Use IPC synth for buffered 
+                               multithreaded synthesis""")
 
 
 def _get_input():
@@ -80,7 +84,8 @@ def _get_input():
                                  batch_size=FLAGS.batch_size,
                                  filter_fn=filter_fn,
                                  synth_config_file=FLAGS.synth_config_file,
-                                 num_epochs=1 )
+                                 num_epochs=1,
+                                 ipc_synth=FLAGS.ipc_synth )
     return dataset
 
 

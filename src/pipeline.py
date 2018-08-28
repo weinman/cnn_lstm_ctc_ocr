@@ -27,7 +27,8 @@ def get_data( static_data,
               boundaries=[32, 64, 96, 128, 160, 192, 224, 256],
               num_epochs=None,
               filter_fn=None,
-              synth_config_file=None ):
+              synth_config_file=None,
+              ipc_synth=True ):
     """Get Dataset according to parameters
     Parameters:
       static_data   : boolean for whether to use static or dynamic data
@@ -63,8 +64,20 @@ def get_data( static_data,
         # This is for dynamic data only -- refer to README.md
         # for more usage instructions if relevant
         import maptextsynth as dpipe
+
+        # Ensure synth_config_file is specified
+        if not synth_config_file:
+            print 'Dynamic data pipeline requires synth_config_file.'
+            print 'Please specify a `synth_config_file` using the runtime flag.'
+            print 'Use --help flag for more info.'
+            exit()
+            
+        # 0 producers passed into generator uses
+        # single threaded nonbuffered synth
+        num_producers = num_threads if ipc_synth else 0
+        
         dpipe_args = ( synth_config_file,
-                       num_threads )
+                       num_producers )
 
     # Get raw data
     dataset = dpipe.get_dataset( dpipe_args )
