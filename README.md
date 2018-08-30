@@ -120,3 +120,7 @@ and
 mechanisms for fast, parallel I/O. For training it uses a
 straightforward
 [MonitoredTrainingSession](https://www.tensorflow.org/versions/r1.8/api_docs/python/tf/train/MonitoredTrainingSession). Testing and evaluation manually manage sessions and checkpoints.
+
+# Acknowledgment
+
+This work was supported in part by the National Science Foundation under grant Grant Number [1526350](http://www.nsf.gov/awardsearch/showAward.do?AwardNumber=1526350).
