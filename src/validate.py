@@ -15,11 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-
 import numpy as np
-
 from PIL import Image
-
 import tensorflow as tf
 
 import model_fn
@@ -30,8 +27,6 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string( 'model','../data/model',
                             """Directory for model checkpoints""" )
-tf.app.flags.DEFINE_string( 'device','/gpu:0',
-                            """Device for graph placement""" )
 tf.app.flags.DEFINE_boolean( 'print_score', False,
                              """Print log probability scores with predictions""" )
 tf.app.flags.DEFINE_string( 'lexicon','',
@@ -85,7 +80,7 @@ def main(argv=None):
     
     classifier = tf.estimator.Estimator( config=_get_config(),
                                          model_fn=model_fn.predict_fn(
-                                             FLAGS.device, FLAGS.lexicon), 
+                                             FLAGS.lexicon), 
                                          model_dir=FLAGS.model )
     
     predictions = classifier.predict( input_fn=_get_input )

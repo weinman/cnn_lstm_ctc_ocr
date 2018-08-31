@@ -31,3 +31,6 @@ test:
 
 evaluate:
 	cd src ; python evaluate.py # use --help for options
+
+clean:
+	rm -rf data/model

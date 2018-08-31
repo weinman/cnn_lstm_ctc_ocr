@@ -169,6 +169,5 @@ def main(argv=None):
         hooks = [stop_hook, summary_hook], config=_get_config(), 
         eval_interval_secs= FLAGS.eval_interval_secs )
 
-   
 if __name__ == '__main__':
-    tf.app.run()
+    tf.app.run()   
