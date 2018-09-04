@@ -32,10 +32,10 @@
 # text           : tf.string, []
 #
 #
-# Note: For more detailed information, refer to `_preprocess_fn`
-# in mjsynth.py. Filtering is performed after
-# these transformations have been applied. Therefore, filter_fn args
-# will correspond to the return values of `preprocess_fn`. 
+# Note: For more detailed information, refer to `_preprocess_fn` in
+# mjsynth.py. Filtering is performed after these transformations have
+# been applied. Therefore, filter_fn args will correspond to the
+# return values of `preprocess_fn`.
  
 import tensorflow as tf
 import model
