@@ -49,9 +49,6 @@ tf.app.flags.DEFINE_string( 'filename_pattern','val/words-*',
                             """File pattern for input data""" )
 tf.app.flags.DEFINE_integer( 'num_input_threads',4,
                              """Number of readers for input data""" )
-tf.app.flags.DEFINE_boolean( 'static_data', True,
-                             """Whether to use static data 
-                             (false for dynamic data)""" )
 
 tf.app.flags.DEFINE_integer('min_image_width',None,
                             """Minimum allowable input image width""")
@@ -100,7 +97,7 @@ def _get_input():
         data_args['boundaries']=None
 
     # Get data according to flags
-    dataset = pipeline.get_data( FLAGS.static_data, **data_args)
+    dataset = pipeline.get_data( use_static_data=True, **data_args)
 
     return dataset
 
@@ -146,9 +143,9 @@ def main(argv=None):
     evaluate_fn = model_fn.evaluate_fn()
 
     # Wrap the ops in an Estimator spec object
-    estimator_spec = evaluate_fn(features, labels, 
-                                 tf.estimator.ModeKeys.EVAL, 
-                                 {'continuous_eval': True})
+    estimator_spec = evaluate_fn( features, labels, 
+                                  tf.estimator.ModeKeys.EVAL, 
+                                  {'continuous_eval': True})
 
     # Extract the necessary ops and the final tensors from the estimator spec
     update_op, value_ops = _extract_metric_update_ops(
