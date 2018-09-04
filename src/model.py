@@ -32,8 +32,8 @@ layer_params = [ [  64, 3, 'valid', 'conv1', False],
                  [ 512, 3, 'same',  'conv7', False], 
                  [ 512, 3, 'same',  'conv8', True] ] # hpool 3
 
-rnn_size = 2**9
-dropout_rate = 0.5
+rnn_size = 2**9    # Dimensionality of all RNN elements' hidden layers
+dropout_rate = 0.5 # For RNN layers (currently not used--uncomment below)
 
 def conv_layer( bottom, params, training ):
     """Build a convolutional layer using entry from layer_params)"""
@@ -118,7 +118,7 @@ def convnet_layers( inputs, widths, mode ):
 
 
 def get_sequence_lengths( widths ):    
-    """Calculate resulting sequence length from original image widths"""
+    """Tensor calculating output sequence length from original image widths"""
     kernel_sizes = [params[1] for params in layer_params]
 
     with tf.variable_scope("sequence_length"):
