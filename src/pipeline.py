@@ -18,8 +18,9 @@
 
 import tensorflow as tf
 import numpy as np
+import sys
 
-def get_data( static_data,
+def get_data( use_static_data,
               base_dir=None,
               file_patterns=None,
               num_threads=4,
@@ -28,21 +29,20 @@ def get_data( static_data,
               num_epochs=None,
               filter_fn=None,
               synth_config_file=None,
-              ipc_synth=True ):
+              use_ipc_synth=True ):
     """Get Dataset according to parameters
     Parameters:
-      static_data   : boolean for whether to use static or dynamic data
-      base_dir      : string for static data locations (static data only)
-      file_patterns : string for static data patterns  (static data only)
-      num_threads   : number of threads to use for IO / preprocessing
-      batch_size    : batch size
-      boundaries    : boundaries for bucketing. If None, no bucketing
-      num_epochs    : if None, data repeats infinitely (static data only)
-      filter_fn     : filtering function
-      synth_config_file: 
-                      string for synthesizer config file (dynamic data only)
-      synth_lexicon_file: 
-                      string for synthesizer lexicon file (dynamic data only)
+      use_static_data   : boolean for whether to use static or dynamic data
+      base_dir          : string for static data locations (static data only)
+      file_patterns     : string for static data patterns  (static data only)
+      num_threads       : number of threads to use for IO / preprocessing
+      batch_size        : number of images to use in each batch 
+      boundaries        : boundaries for bucketing. If None, no bucketing used
+      num_epochs        : if None, data repeats infinitely (static data only)
+      filter_fn         : filtering function
+      synth_config_file : string for synthesizer config file (dynamic data only)
+      use_ipc_synth:    : boolean for IPC versus single-thread synthesizer
+                      
     Returns:
       dataset : tf.data.Dataset object.
                 elements structured as [features, labels]
@@ -54,27 +54,23 @@ def get_data( static_data,
 
     # Get correct import and args for given pipeline
     # `dpipe` will be a variable for the package name
-    if static_data:
+    if use_static_data:
         import mjsynth as dpipe
         dpipe_args = ( base_dir, 
                        file_patterns, 
                        num_threads, 
                        num_buffered_elements )
     else:
-        # This is for dynamic data only -- refer to README.md
-        # for more usage instructions if relevant
+        # For dynamic data only -- refer to README.md for additional instructions
         import maptextsynth as dpipe
 
         # Ensure synth_config_file is specified
         if not synth_config_file:
-            print 'Dynamic data pipeline requires synth_config_file.'
-            print 'Please specify a `synth_config_file` using the runtime flag.'
-            print 'Use --help flag for more info.'
-            exit()
+            sys.stderr.write("Dynamic data pipeline requires synth_config_file.")
+            sys.exit(1)
             
-        # 0 producers passed into generator uses
-        # single threaded nonbuffered synth
-        num_producers = num_threads if ipc_synth else 0
+        # num_producers=0 uses single-threaded, nonbuffered synthesizer
+        num_producers = num_threads if use_ipc_synth else 0
         
         dpipe_args = ( synth_config_file,
                        num_producers )
@@ -112,10 +108,10 @@ def get_data( static_data,
     dataset = dataset.prefetch( num_buffered_elements )
     
     # Repeat for num_epochs  
-    if num_epochs and static_data:
+    if num_epochs and use_static_data:
         dataset = dataset.repeat( num_epochs )
     # Repeat indefinitely if no num_epochs is specified
-    elif static_data:
+    elif use_static_data:
         dataset = dataset.repeat()
     
     # Prepare dataset for Estimator ingestion
