@@ -263,9 +263,10 @@ def train_fn( scope, tune_from, learning_rate,
                                         decay_staircase, momentum )
         
         # Initialize weights from a pre-trained model
+        # NOTE: Does not work when num_gpus>1, cf. tensorflow issue 21615.
         scaffold = tf.train.Scaffold( init_fn=
                                       _get_init_pretrained( tune_from ) )
-        
+
         return tf.estimator.EstimatorSpec( mode=mode, 
                                            loss=loss, 
                                            train_op=train_op,
@@ -292,18 +293,18 @@ def evaluate_fn( ):
             _ = _get_testing( logits,sequence_length,labels,
                               length )
         
-        # Getting the mean label errors
+        # Label errors: mean over the batch and updated total number
         mean_label_error, \
             update_op_label, \
             total_num_label_errors, \
-            total_num_labels= _get_label_err_ops( batch_label_error, 
+            total_num_labels = _get_label_err_ops( batch_label_error, 
                                                   batch_total_labels )
         
-        #Getting the mean sequence errors
+        # Sequence errors: mean over the batch and updated total number
         mean_sequence_error,\
             update_op_seq,\
             total_num_sequence_errs,\
-            total_num_sequences= _get_seq_err_ops( batch_sequence_error, 
+            total_num_sequences = _get_seq_err_ops( batch_sequence_error, 
                                                    length )
         
         # Print the metrics while doing continuous evaluation (evaluate.py) 
@@ -318,10 +319,7 @@ def evaluate_fn( ):
                                              mean_sequence_error] ,
                                             first_n=1)
             
-            
-            
-            # Create summaries for the approprite metrics during continous 
-            #eval
+            # Create summaries for the metrics during continuous eval
             tf.summary.scalar( 'loss', tensor=loss,
                                family='test' )
             tf.summary.scalar( 'label_error', tensor=mean_label_error,
@@ -330,7 +328,7 @@ def evaluate_fn( ):
                                tensor=mean_sequence_error,
                                family='test' )
             
-        # Convert to tensor in order to pass it to eval_metric_ops
+        # Convert to tensor from Variable in order to pass it to eval_metric_ops
         total_num_label_errors = tf.convert_to_tensor(
             total_num_label_errors)
         total_num_labels = tf.convert_to_tensor(
@@ -340,8 +338,7 @@ def evaluate_fn( ):
         total_num_sequences = tf.convert_to_tensor(
             total_num_sequences)
             
-        # All the eval_metric_ops that will be passed on to the 
-        # EstimatorSpec object
+        # All the ops that will be passed to the EstimatorSpec object
         eval_metric_ops = {
             'mean_label_error': ( mean_label_error, update_op_label ),
             'mean_sequence_error': ( mean_sequence_error, update_op_seq ),
@@ -358,7 +355,8 @@ def evaluate_fn( ):
 
 
 def predict_fn( lexicon ):
-    """Returns a function that validates the input data"""
+    """Returns a function that runs the model on the input data 
+       (e.g., for validation)"""
 
     def predict( features, labels, mode ):
 
