@@ -48,3 +48,8 @@ def label_to_string ( labels ):
     """Convert a list of labels to the corresoponding string"""
     string = ''.join( [int_to_string_dict[c] for c in labels] )
     return string
+
+def string_to_label ( string ):
+    """Convert a string to a list of labels"""
+    label = [out_charset_dict[c] for c in string]
+    return label
