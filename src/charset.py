@@ -17,9 +17,10 @@
 # charset.py -- A suite of tools for converting strings to/from labels
 
 
-# The list (well, string) of valid output characters
-# If any example contains a character not found here, 
-# you'll get a runtime error when this is encountered.
+""" 
+The string of valid output characters for the model
+Any example with a character not found here will generate a runtime error
+"""
 out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 
@@ -37,11 +38,13 @@ Produces a table of index->string mappings according to out_charset
 """
 int_to_string_dict = dict(enumerate(out_charset))
 
+
 def num_classes():
     """ Returns length/size of out_charset """
     return len( out_charset )
 
 
 def label_to_string ( labels ):
+    """Convert a list of labels to the corresoponding string"""
     string = ''.join( [int_to_string_dict[c] for c in labels] )
     return string
