@@ -9,7 +9,7 @@ architecture ([arXiv:1507.0571](https://arxiv.org/abs/1507.05717)).
 The provided code downloads and trains using Jaderberg et al.'s
 synthetic data ([IJCV 2016](http://dx.doi.org/10.1007/s11263-015-0823-z)).
 
-Currently updated for TensorFlow 1.8.
+Currently updated for TensorFlow 1.8 or greater.
 
 # Structure
 
@@ -74,8 +74,8 @@ parameters); at one hour (roughly 7000 iterations), the validation
 error is just over 20%.
 
 With the full training data, by one million iterations the model
-typically converges to around 7% training character error and 35% word
-error, both varying by 2–5%.
+typically converges to around 5% training character error and 27.5%
+word error.
 
 # Testing
 
@@ -83,7 +83,7 @@ The evaluate script (`src/evaluate.py`) streams statistics for one batch
 of validation (or evaluation) data. It prints the iteration, evaluation batch
 loss, label error (percentage of characters predicted incorrectly),
 and the sequence error (percentage of words—entire sequences—predicted
-incorrectly.)
+incorrectly).
 
 The test script (`src/test.py`) tallies statistics, finally
 normalizing for all data. It prints the loss, label error, total number of
@@ -110,57 +110,29 @@ parameters. Run `train.py` or `test.py` with the `--help` flag to see
 them or inspect the scripts. Model parameters are not command-line
 configurable and need to be edited in the code (see `model.py`).
 
-# Dynamic data information
+# Dynamic training data
 
-Dynamic data can be used for training or testing by setting the `--static_data` flag to False.  
+Dynamic data can be used for training or testing by setting the
+`--nostatic_data` flag.
 
-You can use the `ipc_synth` boolean flag to determine whether to use single-threaded synthesis or buffered IPC multithreaded synthesis.  
+You can use the `--ipc_synth` boolean flag [default=True] to determine
+whether to use single-threaded or a buffered, multiprocess synthesis.
 
-You **_must_** specify `synth_config_file` in order to get dynamic data synthesis.  
+The `--synth_config_file` flag must be given with `--nostatic_data`.
 
-Dynamic data is synthesized using the MapTextSynthesizer created by Ziwen Chen and Liam Niehus-Staab. The repository is located at: https://github.com/niehusst/MapTextSynthesizer  
-
-Relevant code for MTS (MapTextSynthesizer) can be found within the following directory in the MTS repository: MapTextSynthesizer/tensorflow/generator
-
-# Dynamic data configuration
-```
-git clone https://github.com/niehusst/MapTextSynthesizer.git
-cd ./MapTextSynthesizer
-make static
-export PKG_CONFIG_PATH=`pwd`
-cd ./tensorflow/generator/
-make lib
-export PYTHONPATH=$PYTHONPATH:`pwd`
-export PATH=$PATH:`pwd`/ipc_synth
-export MTS_IPC=`pwd`/ipc_synth
-export OPENCV_OPENCL_RUNTIME=null
-export OPENCV_OPENCL_DEVICE=disabled
-```
-* `OPENCV_*` environmental variables are specified to prevent OPENCV from trying to use GPU when converting image from 4 channels to 1 channel. 
-* `PYTHONPATH` is specified so that maptextsynth.py can be found when importing from pipeline.py.
-* `PATH` is specified so that `producer` and `base` can be found when `execvp`'ing for IPC multithreaded synthesis.
-* `MTS_IPC` is to get a pathname for unique IPC keygen
-If these steps are completed successfully, then train.py --static_data=False should run successfully. You should see `Failed to load OpenCL runtime` `num_producers` times. This is good, and means that cv isn't taking GPU for no good reason.   
-Additional configuration options to keep in mind with dynamic data:
-* The synthesizer's config file can be specified using runtime flags. Use the `--help` flag for more information. Also more information can be found in the README.md of the MapTextSynthesizer repository.
-
-# IPC Specific Things-to-know
-* Once you're done using IPC, you can cleanup the shared memory and semaphores by running `mts_ipc_cleanup`. This is located in `/path/to/MapTextSyntheser/tensorflow/generator/ipc_synth/`, so if your path is configured appropriately you can just type the command.
-* If you haven't gotten a global step in a while, and you notice that your CPU usage for the `python` tensorflow process is consistently stuck at 100 via `top`, then it's likely that the consumer is stuck, which is likely the result of some sort of race condition I (@gaffordb) haven't accounted for. Or just check to see if something killed your `producer` processes. 
-parameters. Run (e.g., `train.py`) with the `--help` flag to see these
-options, or else inspect the scripts. Model parameters are *not*
-command-line configurable and need to be edited in the code (see
-`model.py`).
+The
+[MapTextSynthesizer](https://github.com/weinman/MapTextSynthesizer)
+library supports training with dynamically synthesized data. The
+relevant code can be found within
+[MapTextSynthesizer/tensorflow/generator](https://github.com/weinman/MapTextSynthesizer/tree/src/tensorflow/generator)
 
 # API Notes
 
-This version uses the original TensorFlow
-[Reader](https://www.tensorflow.org/versions/r1.8/api_guides/python/io_ops#Readers)
-and
-[QueueRunner](https://www.tensorflow.org/versions/r1.8/api_guides/python/reading_data#_QueueRunner)
-mechanisms for fast, parallel I/O. For training it uses a
-straightforward
-[MonitoredTrainingSession](https://www.tensorflow.org/versions/r1.8/api_docs/python/tf/train/MonitoredTrainingSession). Testing and evaluation manually manage sessions and checkpoints.
+This version uses the TensorFlow
+[Dataset](https://www.tensorflow.org/guide/datasets) API for fast
+I/O. Training, testing, validation, and prediction use a custom
+[Estimator](https://www.tensorflow.org/guide/estimators)
+framework.
 
 # Acknowledgment
 
