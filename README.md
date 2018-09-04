@@ -9,7 +9,7 @@ architecture ([arXiv:1507.0571](https://arxiv.org/abs/1507.05717)).
 The provided code downloads and trains using Jaderberg et al.'s
 synthetic data ([IJCV 2016](http://dx.doi.org/10.1007/s11263-015-0823-z)).
 
-Currently updated for TensorFlow 1.8 or greater.
+Currently updated for TensorFlow 1.10.
 
 # Structure
 
@@ -129,10 +129,9 @@ relevant code can be found within
 # API Notes
 
 This version uses the TensorFlow
-[Dataset](https://www.tensorflow.org/guide/datasets) API for fast
+[Dataset](https://www.tensorflow.org/guide/datasets) for fast
 I/O. Training, testing, validation, and prediction use a custom
-[Estimator](https://www.tensorflow.org/guide/estimators)
-framework.
+[Estimator](https://www.tensorflow.org/guide/estimators).
 
 # Acknowledgment
 
