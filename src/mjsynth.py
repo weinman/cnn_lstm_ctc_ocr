@@ -42,7 +42,6 @@ def get_dataset( args ):
                   tf.string tensor of shape []
     """
 
-
     # Extract args
     [ base_dir, file_patterns, num_threads, buffer_sz ] = args[0:4]
 
@@ -59,7 +58,6 @@ def get_dataset( args ):
     dataset = tf.data.TFRecordDataset( ds_filenames, 
                                        num_parallel_reads=num_threads,
                                        buffer_size=buffer_sz )
-
     return dataset
 
 
