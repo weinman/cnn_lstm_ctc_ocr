@@ -14,6 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# validate.py - Run model directly on from paths to image filenames. 
+# NOTE: assumes mjsynth files are given by adding an extra row of padding
+
 import sys
 import numpy as np
 from PIL import Image
@@ -32,8 +35,9 @@ tf.app.flags.DEFINE_boolean( 'print_score', False,
 tf.app.flags.DEFINE_string( 'lexicon','',
 			    """File containing lexicon of image words""" )
 
-#tf.logging.set_verbosity( tf.logging.WARN )
+
 tf.logging.set_verbosity( tf.logging.INFO )
+
 
 def _get_image( filename ):
     """Load image data for placement in graph"""
