@@ -97,12 +97,15 @@ def preprocess_fn( data ):
     return image, width, label, length, text
 
 
-def element_length_fn( image, width, label, length, text ):
-    return width
+def element_length_fn( image, image_width, label, label_seq_length, text ):
+    return image_width
 
 
 def postbatch_fn( image, width, label, length, text ):
-    # Batching complete, so now we can re-sparsify our labels for ctc_loss
+    """Post-batching, postprocessing: packs raw tensors into a dictionary for 
+       Dataset's iterator output"""
+
+    # Batching is complete, so now we can re-sparsify our labels for ctc_loss
     label = tf.cast( tf.deserialize_many_sparse( label, tf.int64 ),
                      tf.int32 )
     
