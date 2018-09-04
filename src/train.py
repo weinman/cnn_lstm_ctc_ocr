@@ -44,25 +44,18 @@ tf.app.flags.DEFINE_float('decay_steps',2**16,
                           """Learning rate decay exponent scale""")
 tf.app.flags.DEFINE_boolean('decay_staircase',False,
                           """Staircase learning rate decay by integer division""")
-
-
 tf.app.flags.DEFINE_integer('max_num_steps', 2**21,
                             """Number of optimization steps to run""")
-tf.app.flags.DEFINE_boolean('static_data', True,
-                            """Whether to use static data 
-                            (false for dynamic data)""")
 tf.app.flags.DEFINE_integer('save_checkpoint_secs', 120,
                             """Interval between daving checkpoints""")
 
+tf.app.flags.DEFINE_integer('num_input_threads',4,
+                          """Number of readers/generators for input data""")
 tf.app.flags.DEFINE_integer('num_gpus', 1,
                             """Number of GPUs to use for distributed training""")
+tf.app.flags.DEFINE_boolean('bucket_data',True,
+                            """Bucket training data by width for efficiency""")
 
-tf.app.flags.DEFINE_string('train_path','../data/train/',
-                           """Base directory for training data""")
-tf.app.flags.DEFINE_string('filename_pattern','words-*',
-                           """File pattern for input data""")
-tf.app.flags.DEFINE_integer('num_input_threads',4,
-                          """Number of readers for input data""")
 tf.app.flags.DEFINE_integer('min_image_width',None,
                             """Minimum allowable input image width""")
 tf.app.flags.DEFINE_integer('max_image_width',None,
@@ -72,19 +65,23 @@ tf.app.flags.DEFINE_integer('min_string_length',None,
 tf.app.flags.DEFINE_integer('max_string_length',None,
                             """Maximum allowable input string_length""")
 
+tf.app.flags.DEFINE_boolean('static_data', True,
+                            """Whether to use static data 
+                            (false for dynamic data)""")
+tf.app.flags.DEFINE_string('train_path','../data/train/',
+                           """Base directory for training data""")
+tf.app.flags.DEFINE_string('filename_pattern','words-*',
+                           """File pattern for input data""")
 
-tf.app.flags.DEFINE_string('synth_config_file',
-                           None,
+tf.app.flags.DEFINE_string('synth_config_file', None,
                            """Location of config file for map text synthesizer""")
 tf.app.flags.DEFINE_boolean('ipc_synth',True,
-                            """Use IPC synth for buffered 
-                               multithreaded synthesis""")
+                            """Use multi-process dynamic image synthesis""")
 
-tf.app.flags.DEFINE_boolean('bucket_data',True,
-                            """Bucket training data by width for efficiency""")
 
 # For displaying various statistics while training
 tf.logging.set_verbosity( tf.logging.INFO )
+
 
 def _get_input():
     """
@@ -107,23 +104,25 @@ def _get_input():
                   max_image_width=FLAGS.max_image_width,
                   min_string_length=FLAGS.min_string_length,
                   max_string_length=FLAGS.max_string_length,
-                  check_input=(not FLAGS.static_data))
+                  check_input=(not FLAGS.static_data) )
     
     gpu_batch_size = FLAGS.batch_size / FLAGS.num_gpus
     
     # Pack keyword arguments into dictionary
-    data_args = { 'base_dir': FLAGS.train_path,
-                  'file_patterns': str.split(FLAGS.filename_pattern, ','),
-                  'num_threads': FLAGS.num_input_threads,
+    data_args = { 'num_threads': FLAGS.num_input_threads,
                   'batch_size': gpu_batch_size,
-                  'filter_fn': filter_fn,
-                  'synth_config_file': FLAGS.synth_config_file,
-                  'ipc_synth': FLAGS.ipc_synth
-    }
+                  'filter_fn': filter_fn }
+
+    if FLAGS.static_data: # Pack data stream-specific parameters
+        data_args['base_dir'] = FLAGS.train_path
+        data_args['file_patterns'] = str.split(FLAGS.filename_pattern, ',')
+    else:
+        data_args['synth_config_file'] = FLAGS.synth_config_file
+        data_args['use_ipc_synth'] = FLAGS.ipc_synth
 
     if not FLAGS.bucket_data:
         data_args['boundaries']=None # Turn off bucketing (on by default)
-    elif not FLAGS.static_data:
+    elif not FLAGS.static_data: # Extra buckets for the wider synthetic data
         data_args['boundaries']=[32, 64, 96, 128, 160, 192, 224, 256,
                                  288, 320, 352, 384, 416, 448, 480, 512]
         
@@ -131,6 +130,7 @@ def _get_input():
     dataset = pipeline.get_data( FLAGS.static_data, **data_args)
 
     return dataset
+
 
 def _get_distribution_strategy():
     """Configure training distribution strategy"""
