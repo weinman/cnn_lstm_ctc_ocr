@@ -18,6 +18,8 @@ import os
 import tensorflow as tf
 import math
 
+import charset
+
 """Each record within the TFRecord file is a serialized Example proto. 
 The Example proto contains the following fields:
   image/encoded: string containing JPEG encoded grayscale image
@@ -27,12 +29,6 @@ The Example proto contains the following fields:
   image/labels: list containing the sequence labels for the image text
   image/text: string specifying the human-readable version of the text
 """
-
-# The list (well, string) of valid output characters
-# If any example contains a character not found here, an error will result
-# from the calls to .index in the decoder below
-out_charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-
 jpeg_data = tf.placeholder( dtype=tf.string )
 jpeg_decoder = tf.image.decode_jpeg( jpeg_data,channels=1 )
 
@@ -56,6 +52,7 @@ def calc_seq_len( image_width ):
     return seq_len
 
 seq_lens = [calc_seq_len( w ) for w in range( 1024 )]
+
 
 def gen_data( input_base_dir, image_list_filename, output_filebase, 
               num_shards=1000, start_shard=0 ):
@@ -92,6 +89,7 @@ def gen_data( input_base_dir, image_list_filename, output_filebase,
 
     sess.close()
 
+    
 def gen_shard( sess, input_base_dir, image_filenames, output_filename ):
     """Create a TFRecord file from a list of image filenames"""
     writer = tf.python_io.TFRecordWriter( output_filename )
@@ -129,6 +127,7 @@ def get_image_filenames( image_list_filename ):
             filenames.append( filename )
     return filenames
 
+
 def get_image( sess, filename ):
     """Given path to an image file, load its data and size"""
     with tf.gfile.FastGFile( filename, 'r' ) as f:
@@ -138,10 +137,12 @@ def get_image( sess, filename ):
     width = image.shape[1]
     return image_data, height, width
 
+
 def is_writable( image_width, text ):
     """Determine whether the CNN-processed image is longer than the string"""
     return (image_width > min_width) and (len( text ) <= seq_lens[image_width])
-    
+
+
 def get_text_and_labels( filename ):
     """ 
     Extract the human-readable text and label sequence from image filename
@@ -153,8 +154,10 @@ def get_text_and_labels( filename ):
 
     # Transform string text to sequence of indices using charset, e.g.,
     # MONIKER -> [12, 14, 13, 8, 10, 4, 17]
-    labels = [out_charset.index( c ) for c in list( text )]
+    labels = charset.string_to_label(text)
+    
     return text, labels
+
 
 def make_example( filename, image_data, labels, text, height, width ):
     """Build an Example proto for an example.
@@ -179,11 +182,14 @@ def make_example( filename, image_data, labels, text, height, width ):
     }))
     return example
 
+
 def _int64_feature( values ):
     return tf.train.Feature( int64_list=tf.train.Int64List( value=values ) )
 
+
 def _bytes_feature( values ):
     return tf.train.Feature( bytes_list=tf.train.BytesList( value=[values] ) )
+
 
 def main( argv=None ):
     
@@ -191,5 +197,6 @@ def main( argv=None ):
     gen_data( '../data/images', 'annotation_val.txt',   '../data/val/words' )
     gen_data( '../data/images', 'annotation_test.txt',  '../data/test/words' )
 
+    
 if __name__ == '__main__':
     main()
