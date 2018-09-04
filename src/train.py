@@ -1,5 +1,5 @@
 # CNN-LSTM-CTC-OCR
-# Copyright (C) 2017 Jerod Weinman
+# Copyright (C) 2017,2018 Jerod Weinman, Abyaya Lamsal, Benjamin Gafford
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,12 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-import tensorflow as tf
-from tensorflow.contrib import learn
+# train.py -- Train all or only part of the model from scratch or an
+#   existing checkpoint.
 
-import mjsynth
-import model
+import tensorflow as tf
+import pipeline
+import charset
+import model_fn
+import filters
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -42,180 +44,139 @@ tf.app.flags.DEFINE_float('decay_steps',2**16,
                           """Learning rate decay exponent scale""")
 tf.app.flags.DEFINE_boolean('decay_staircase',False,
                           """Staircase learning rate decay by integer division""")
-
-
 tf.app.flags.DEFINE_integer('max_num_steps', 2**21,
                             """Number of optimization steps to run""")
+tf.app.flags.DEFINE_integer('save_checkpoint_secs', 120,
+                            """Interval between daving checkpoints""")
 
-tf.app.flags.DEFINE_string('train_device','/gpu:1',
-                           """Device for training graph placement""")
-tf.app.flags.DEFINE_string('input_device','/gpu:0',
-                           """Device for preprocess/batching graph placement""")
+tf.app.flags.DEFINE_integer('num_input_threads',4,
+                          """Number of readers/generators for input data""")
+tf.app.flags.DEFINE_integer('num_gpus', 1,
+                            """Number of GPUs to use for distributed training""")
+tf.app.flags.DEFINE_boolean('bucket_data',True,
+                            """Bucket training data by width for efficiency""")
 
+tf.app.flags.DEFINE_integer('min_image_width',None,
+                            """Minimum allowable input image width""")
+tf.app.flags.DEFINE_integer('max_image_width',None,
+                            """Maximum allowable input image width""")
+tf.app.flags.DEFINE_integer('min_string_length',None,
+                            """Minimum allowable input string length""")
+tf.app.flags.DEFINE_integer('max_string_length',None,
+                            """Maximum allowable input string_length""")
+
+tf.app.flags.DEFINE_boolean('static_data', True,
+                            """Whether to use static data 
+                            (false for dynamic data)""")
 tf.app.flags.DEFINE_string('train_path','../data/train/',
                            """Base directory for training data""")
 tf.app.flags.DEFINE_string('filename_pattern','words-*',
                            """File pattern for input data""")
-tf.app.flags.DEFINE_integer('num_input_threads',4,
-                          """Number of readers for input data""")
-tf.app.flags.DEFINE_integer('width_threshold',None,
-                            """Limit of input image width""")
-tf.app.flags.DEFINE_integer('length_threshold',None,
-                            """Limit of input string length width""")
 
-tf.logging.set_verbosity(tf.logging.INFO)
+tf.app.flags.DEFINE_string('synth_config_file', None,
+                           """Location of config file for map text synthesizer""")
+tf.app.flags.DEFINE_boolean('ipc_synth',True,
+                            """Use multi-process dynamic image synthesis""")
 
-# Non-configurable parameters
-optimizer='Adam'
-mode = learn.ModeKeys.TRAIN # 'Configure' training mode for dropout layers
+
+# For displaying various statistics while training
+tf.logging.set_verbosity( tf.logging.INFO )
+
 
 def _get_input():
-    """Set up and return image, label, and image width tensors"""
+    """
+    Get tf.data.Dataset according to command-line flags for training 
+    using tf.estimator.Estimator
 
-    image,width,label,_,_,_=mjsynth.bucketed_input_pipeline(
-        FLAGS.train_path, 
-        str.split(FLAGS.filename_pattern,','),
-        batch_size=FLAGS.batch_size,
-        num_threads=FLAGS.num_input_threads,
-        input_device=FLAGS.input_device,
-        width_threshold=FLAGS.width_threshold,
-        length_threshold=FLAGS.length_threshold )
+    Note: Default behavior is bucketing according to default bucket boundaries
+    listed in pipeline.get_data
 
-    #tf.summary.image('images',image) # Uncomment to see images in TensorBoard
-    return image,width,label
+    Returns:
+      dataset : elements structured as [features, labels]
+                feature structure can be seen in postbatch_fn 
+                in mjsynth.py or maptextsynth.py for static or dynamic
+                data pipelines respectively
+    """
 
+    # WARNING: More than two filters causes SEVERE throughput slowdown
+    filter_fn = filters.input_filter_fn \
+                ( min_image_width=FLAGS.min_image_width,
+                  max_image_width=FLAGS.max_image_width,
+                  min_string_length=FLAGS.min_string_length,
+                  max_string_length=FLAGS.max_string_length,
+                  check_input=(not FLAGS.static_data) )
+    
+    gpu_batch_size = FLAGS.batch_size / FLAGS.num_gpus
+    
+    # Pack keyword arguments into dictionary
+    data_args = { 'num_threads': FLAGS.num_input_threads,
+                  'batch_size': gpu_batch_size,
+                  'filter_fn': filter_fn }
 
-def _get_single_input():
-    """Set up and return image, label, and width tensors"""
+    if FLAGS.static_data: # Pack data stream-specific parameters
+        data_args['base_dir'] = FLAGS.train_path
+        data_args['file_patterns'] = str.split(FLAGS.filename_pattern, ',')
+    else:
+        data_args['synth_config_file'] = FLAGS.synth_config_file
+        data_args['use_ipc_synth'] = FLAGS.ipc_synth
 
-    image,width,label,length,text,filename=mjsynth.threaded_input_pipeline(
-        deps.get('records'), 
-        str.split(FLAGS.filename_pattern,','),
-        batch_size=1,
-        num_threads=FLAGS.num_input_threads,
-        num_epochs=1,
-        batch_device=FLAGS.input_device, 
-        preprocess_device=FLAGS.input_device )
-    return image,width,label,length,text,filename
+    if not FLAGS.bucket_data:
+        data_args['boundaries']=None # Turn off bucketing (on by default)
+    elif not FLAGS.static_data: # Extra buckets for the wider synthetic data
+        data_args['boundaries']=[32, 64, 96, 128, 160, 192, 224, 256,
+                                 288, 320, 352, 384, 416, 448, 480, 512]
+        
+    # Get data according to flags
+    dataset = pipeline.get_data( FLAGS.static_data, **data_args)
 
-
-def _get_training(rnn_logits,label,sequence_length):
-    """Set up training ops"""
-    with tf.name_scope("train"):
-
-        if FLAGS.tune_scope:
-            scope=FLAGS.tune_scope
-        else:
-            scope="convnet|rnn"
-
-        rnn_vars = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES,
-                                       scope=scope)
-
-        loss = model.ctc_loss_layer(rnn_logits,label,sequence_length) 
-
-        # Update batch norm stats [http://stackoverflow.com/questions/43234667]
-        extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-
-        with tf.control_dependencies(extra_update_ops):
-
-            learning_rate = tf.train.exponential_decay(
-                FLAGS.learning_rate,
-                tf.train.get_global_step(),
-                FLAGS.decay_steps,
-                FLAGS.decay_rate,
-                staircase=FLAGS.decay_staircase,
-                name='learning_rate')
-
-            optimizer = tf.train.AdamOptimizer(
-                learning_rate=learning_rate,
-                beta1=FLAGS.momentum)
-            
-            train_op = tf.contrib.layers.optimize_loss(
-                loss=loss,
-                global_step=tf.train.get_global_step(),
-                learning_rate=learning_rate, 
-                optimizer=optimizer,
-                variables=rnn_vars)
-
-            tf.summary.scalar( 'learning_rate', learning_rate )
-
-    return train_op
+    return dataset
 
 
-def _get_session_config():
-    """Setup session config to soften device placement"""
+def _get_distribution_strategy():
+    """Configure training distribution strategy"""
+    
+#    if FLAGS.num_gpus == 1: # cannot restore until at least r1.10 (02ae1e2)
+#        return tf.contrib.distribute.OneDeviceStrategy(device='/gpu:0')
+    if FLAGS.num_gpus > 1:
+        return tf.contrib.distribute.MirroredStrategy(num_gpus=FLAGS.num_gpus)
+    else:
+        return None
 
-    config=tf.ConfigProto(
+    
+def _get_config():
+    """Setup config to soften device placement and set chkpt saving intervals"""
+    
+    device_config=tf.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False)
 
-    return config
+    custom_config = tf.estimator.RunConfig(
+        session_config=device_config,
+        train_distribute=_get_distribution_strategy(),
+        save_checkpoints_secs=FLAGS.save_checkpoint_secs)
+
+    return custom_config 
 
 
-def _get_init_pretrained():
-    """Return lambda for reading pretrained initial model"""
-    
-    if not FLAGS.tune_from:
-        return None
-    
-    saver_reader = tf.train.Saver(
-        tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
-    
-    ckpt_path=FLAGS.tune_from
+def main( argv=None ):
 
-    init_fn = lambda sess: saver_reader.restore(sess, ckpt_path)
+    # Set up a dictionary of arguments to be passed for training
+    train_args = {'scope': FLAGS.tune_scope, 
+                  'tune_from': FLAGS.tune_from, 
+                  'learning_rate': FLAGS.learning_rate, 
+                  'decay_steps': FLAGS.decay_steps, 
+                  'decay_rate': FLAGS.decay_rate, 
+                  'decay_staircase': FLAGS.decay_staircase, 
+                  'momentum':FLAGS.momentum}
 
-    return init_fn
-
-
-def main(argv=None):
-    
-    with tf.Graph().as_default():
-        global_step = tf.train.get_or_create_global_step()
-        
-        image, width, label = _get_input()
-
-        with tf.device(FLAGS.train_device):
-            features,sequence_length = model.convnet_layers( image, width, mode)
-            logits = model.rnn_layers( features, sequence_length,
-                                       mjsynth.num_classes() )
-            train_op = _get_training(logits,label,sequence_length)
-
-        session_config = _get_session_config()
-
-        summary_op = tf.summary.merge_all()
-        init_op = tf.group( tf.global_variables_initializer(),
-                            tf.local_variables_initializer())
-
-        init_scaffold = tf.train.Scaffold(
-            init_op=init_op,
-            init_fn=_get_init_pretrained()
-        )
-
-        summary_hook = tf.train.SummarySaverHook(
-            output_dir=FLAGS.output,
-            save_secs=30,
-            summary_op=summary_op
-        )
-        
-        saver_hook = tf.train.CheckpointSaverHook(
-            checkpoint_dir=FLAGS.output,
-            save_secs=150
-        )
-
-        monitor = tf.train.MonitoredTrainingSession(
-            checkpoint_dir=FLAGS.output, # Necessary to restore
-            hooks=[summary_hook,saver_hook],
-            config=session_config,
-            scaffold=init_scaffold       # Scaffold initializes session
-        )
-        
-        with monitor as sess:
-            step = sess.run(global_step)
-            while step < FLAGS.max_num_steps:
-                if monitor.should_stop():
-                    break
-                [step_loss,step]=sess.run([train_op, global_step])
+    # Initialize the classifier
+    classifier = tf.estimator.Estimator( config=_get_config(), 
+                                         model_fn=model_fn.train_fn(
+                                             **train_args),
+                                         model_dir=FLAGS.output )
+   
+    # Train the model
+    classifier.train( input_fn=_get_input, max_steps=FLAGS.max_num_steps )
 
 if __name__ == '__main__':
     tf.app.run()

@@ -9,7 +9,7 @@ architecture ([arXiv:1507.0571](https://arxiv.org/abs/1507.05717)).
 The provided code downloads and trains using Jaderberg et al.'s
 synthetic data ([IJCV 2016](http://dx.doi.org/10.1007/s11263-015-0823-z)).
 
-Currently updated for TensorFlow 1.8.
+Currently updated for TensorFlow 1.10.
 
 # Structure
 
@@ -74,19 +74,19 @@ parameters); at one hour (roughly 7000 iterations), the validation
 error is just over 20%.
 
 With the full training data, by one million iterations the model
-typically converges to around 7% training character error and 35% word
-error, both varying by 2–5%.
+typically converges to around 5% training character error and 27.5%
+word error.
 
 # Testing
 
-The test script (`src/test.py`) streams statistics for small batches
-of validation (or test) data. It prints the iteration, test batch
+The evaluate script (`src/evaluate.py`) streams statistics for one batch
+of validation (or evaluation) data. It prints the iteration, evaluation batch
 loss, label error (percentage of characters predicted incorrectly),
 and the sequence error (percentage of words—entire sequences—predicted
-incorrectly.)
+incorrectly).
 
-The evaluation script (`src/evaluate.py`) tallies statistics, finally
-normalizing for all data. It prints the label error, total number of
+The test script (`src/test.py`) tallies statistics, finally
+normalizing for all data. It prints the loss, label error, total number of
 labels, sequence error, total number of sequences, and the label error
 rate and sequence error rate.
 
@@ -106,20 +106,32 @@ model to run the input entered so far).
 # Configuration
 
 There are many command-line options to configure training
-parameters. Run (e.g., `train.py`) with the `--help` flag to see these
-options, or else inspect the scripts. Model parameters are *not*
-command-line configurable and need to be edited in the code (see
-`model.py`).
+parameters. Run `train.py` or `test.py` with the `--help` flag to see
+them or inspect the scripts. Model parameters are not command-line
+configurable and need to be edited in the code (see `model.py`).
+
+# Dynamic training data
+
+Dynamic data can be used for training or testing by setting the
+`--nostatic_data` flag.
+
+You can use the `--ipc_synth` boolean flag [default=True] to determine
+whether to use single-threaded or a buffered, multiprocess synthesis.
+
+The `--synth_config_file` flag must be given with `--nostatic_data`.
+
+The
+[MapTextSynthesizer](https://github.com/weinman/MapTextSynthesizer)
+library supports training with dynamically synthesized data. The
+relevant code can be found within
+[MapTextSynthesizer/tensorflow/generator](https://github.com/weinman/MapTextSynthesizer/tree/src/tensorflow/generator)
 
 # API Notes
 
-This version uses the original TensorFlow
-[Reader](https://www.tensorflow.org/versions/r1.8/api_guides/python/io_ops#Readers)
-and
-[QueueRunner](https://www.tensorflow.org/versions/r1.8/api_guides/python/reading_data#_QueueRunner)
-mechanisms for fast, parallel I/O. For training it uses a
-straightforward
-[MonitoredTrainingSession](https://www.tensorflow.org/versions/r1.8/api_docs/python/tf/train/MonitoredTrainingSession). Testing and evaluation manually manage sessions and checkpoints.
+This version uses the TensorFlow
+[Dataset](https://www.tensorflow.org/guide/datasets) for fast
+I/O. Training, testing, validation, and prediction use a custom
+[Estimator](https://www.tensorflow.org/guide/estimators).
 
 # Acknowledgment
 
