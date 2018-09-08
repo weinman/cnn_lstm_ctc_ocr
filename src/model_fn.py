@@ -357,7 +357,7 @@ def evaluate_fn( ):
 def predict_fn( lexicon ):
     """Returns a function that runs the model on the input data 
        (e.g., for validation)"""
-
+    # Assumes only a single image as input
     def predict( features, labels, mode ):
 
          # Get the appropriate tensors
@@ -365,8 +365,7 @@ def predict_fn( lexicon ):
         width = tf.size( image[1] )
 
         # Pre-process the images
-        proc_image = mjsynth.preprocess_image( image )
-        proc_image = tf.reshape( proc_image,[1,32,-1,1] ) # Make first dim batch
+        proc_image = tf.reshape( image,[1,32,-1,1] ) # Make first dim batch
 
         # Pack the modified image data into a dictionary
         proc_img_data = {'image': proc_image, 'width': width}

@@ -26,6 +26,8 @@ import model_fn
 import charset
 from lexicon import dictionary_from_file
 
+import mjsynth
+
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string( 'model','../data/model',
@@ -64,6 +66,9 @@ def _get_input():
         image_data = _get_image( line.rstrip() )
         temp_dataset = tf.data.Dataset.from_tensors( image_data )
         dataset = dataset.concatenate( temp_dataset )
+
+    # mjsynth input images need preprocessing transformation (shape, range)
+    dataset = dataset.map( mjsynth.preprocess_image )
     
     return dataset
 
