@@ -135,4 +135,6 @@ I/O. Training, testing, validation, and prediction use a custom
 
 # Acknowledgment
 
-This work was supported in part by the National Science Foundation under grant Grant Number [1526350](http://www.nsf.gov/awardsearch/showAward.do?AwardNumber=1526350).
+This work was supported in part by the National Science Foundation
+under grant Grant Number
+[1526350](http://www.nsf.gov/awardsearch/showAward.do?AwardNumber=1526350).
