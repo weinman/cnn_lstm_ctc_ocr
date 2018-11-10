@@ -229,23 +229,46 @@ def _get_output( rnn_logits, sequence_length, lexicon ):
     """
     with tf.name_scope("test"):
 	if lexicon:
-	    dict_tensor = _get_dictionary_tensor( lexicon, 
-                                                  charset.out_charset )
-	    predictions,log_prob = tf.nn.ctc_beam_search_decoder_trie( 
-                rnn_logits,
-                sequence_length,
-                alphabet_size=charset.num_classes() ,
-                dictionary=dict_tensor,
-                beam_width=128,
-                top_paths=1,
-                merge_repeated=True )
+            # Note: TFWordBeamSearch.so must be in LD_LIBRARY_PATH (on *nix)
+            # from github.com/githubharald/CTCWordBeamSearch
+            word_beam_search_module = tf.load_op_library('TFWordBeamSearch.so')
+            beam_width = 128
+            with open(lexicon) as lexicon_fd:
+                corpus = lexicon_fd.read().encode('utf8')
+            # CTCWordBeamSearch requires a non-word char. We hack this by
+            # prepending a zero-prob " " entry to the rnn_probs
+            rnn_probs = tf.nn.softmax(rnn_logits, dim=2) # decodes in expspace :(
+            rnn_probs = tf.pad( rnn_probs,
+                                [[0,0],[0,0],[1,0]], # Add one slice of zeros
+                                mode='CONSTANT',
+                                constant_values=0.0 )
+            chars = (' '+charset.out_charset).encode('utf8')
+            # Assume words can be formed from all chars--if punctuation is added
+            # or numbers (etc) are to be treated differently, more such 
+            # categories should be added to the charset module
+            wordChars = chars[1:]
+            
+            prediction = word_beam_search_module.word_beam_search(
+                rnn_probs,
+                beam_width,
+                'Words', # No LM
+                0.0, # Irrelevant: No LM to smooth
+                corpus,
+                chars,
+                wordChars )
+            prediction = prediction - 1 # Remove hacky prepended non-word char
+            # Match tf.nn.ctc_beam_search_decoder outputs: 
+            # CTCWordBeamSearch returns only top match, so convert to list
+            predictions = [prediction]  
+            log_probs = tf.constant(0, dtype=tf.float32,
+                                    shape=[rnn_probs.shape[1],1] ) # Bx1 (top)
 	else:
-	    predictions,log_prob = tf.nn.ctc_beam_search_decoder( rnn_logits,
+	    predictions,log_probs = tf.nn.ctc_beam_search_decoder( rnn_logits,
                                                            sequence_length,
                                                            beam_width=128,
                                                            top_paths=1,
                                                            merge_repeated=True )
-    return predictions, log_prob
+    return predictions, log_probs
 
 
 def train_fn( scope, tune_from, learning_rate, 
@@ -372,16 +395,29 @@ def predict_fn( lexicon ):
 
         logits, sequence_length = _get_image_info(proc_img_data, mode)
         
-        prediction, log_prob = _get_output( logits,sequence_length, lexicon )
+        predictions, log_probs = _get_output( logits,sequence_length, lexicon )
+
+        print 'predictions = ',predictions
         
-        # predictions only takes dense tensors
-        final_pred = tf.sparse_to_dense( prediction[0].indices, 
-                                         prediction[0].dense_shape, 
-                                         prediction[0].values, 
+        if lexicon:
+            # CTCWordBeamSearch produces dense BxT result, including trailing
+            # CTC blanks
+            dense_top_pred = predictions[0]
+
+            # Filter trailing blanks to match
+            pred_mask = tf.not_equal(dense_top_pred, logits.shape[2]-1)
+            pred_mask.set_shape([None]) # ?,1 or Tx1. In np .shape is (T,)
+            final_pred = tf.boolean_mask( dense_top_pred, pred_mask, axis=1)
+        else:
+            # tf.nn.ctc_beam_search produces SparseTensor but EstimatorSpec
+            # predictions only takes dense tensors
+            final_pred = tf.sparse_to_dense( predictions[0].indices, 
+                                         predictions[0].dense_shape, 
+                                         predictions[0].values, 
                                          default_value=0 ) 
         
         return tf.estimator.EstimatorSpec( mode=mode,
                                            predictions={ 'labels': final_pred,
-                                                         'score': log_prob })
+                                                         'score': log_probs[0] })
 
     return predict
