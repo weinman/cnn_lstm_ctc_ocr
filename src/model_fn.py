@@ -108,7 +108,7 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
 
 
 
-def _get_testing( rnn_logits,sequence_length,label,label_length ):
+def _get_testing( rnn_logits,sequence_length,label,label_length, lexicon ):
     """Create ops for testing (all scalars): 
        loss: CTC loss function value, 
        label_error:   batch level edit distance on beam search max
@@ -118,11 +118,7 @@ def _get_testing( rnn_logits,sequence_length,label,label_length ):
     with tf.name_scope( "train" ):
         loss = model.ctc_loss_layer( rnn_logits,label,sequence_length ) 
     with tf.name_scope( "test" ):
-        predictions,_ = tf.nn.ctc_beam_search_decoder( rnn_logits, 
-                                                       sequence_length,
-                                                       beam_width=128,
-                                                       top_paths=1,
-                                                       merge_repeated=True )
+        predictions,_ = _get_output( rnn_logits, sequence_length, lexicon )
 
         hypothesis = tf.cast( predictions[0], tf.int32 ) # for edit_distance
 
@@ -250,18 +246,23 @@ def _get_output( rnn_logits, sequence_length, lexicon ):
             
             prediction = word_beam_search_module.word_beam_search(
                 rnn_probs,
+                sequence_length,
                 beam_width,
-                'Words', # No LM
+                'Words', # Use No LM
                 0.0, # Irrelevant: No LM to smooth
-                corpus,
+                corpus, # aka lexicon [are unigrams ignored?]
                 chars,
                 wordChars )
             prediction = prediction - 1 # Remove hacky prepended non-word char
-            # Match tf.nn.ctc_beam_search_decoder outputs: 
+            # Match tf.nn.ctc_beam_search_decoder outputs: list of sparse
+            prediction = tf.contrib.layers.dense_to_sparse(
+                prediction,
+                eos_token=len(chars)-1 ) # Index of CTC blank
+            # Reconstruct sparse tensor, removing hacky prepended non-word char
             # CTCWordBeamSearch returns only top match, so convert to list
             predictions = [prediction]  
-            log_probs = tf.constant(0, dtype=tf.float32,
-                                    shape=[rnn_probs.shape[1],1] ) # Bx1 (top)
+            log_probs = tf.constant(0, dtype=tf.float32)#,
+                                    #shape=[rnn_probs.shape[1]] ) # Bx1 (top)
 	else:
 	    predictions,log_probs = tf.nn.ctc_beam_search_decoder( rnn_logits,
                                                            sequence_length,
@@ -297,7 +298,7 @@ def train_fn( scope, tune_from, learning_rate,
     return train
 
 
-def evaluate_fn( ):
+def evaluate_fn( lexicon ):
     """Returns a function that evaluates the model for all batches at once or 
     continuously for one batch"""
 
@@ -314,7 +315,7 @@ def evaluate_fn( ):
             batch_sequence_error, \
             batch_total_labels, \
             _ = _get_testing( logits,sequence_length,labels,
-                              length )
+                              length, lexicon )
         
         # Label errors: mean over the batch and updated total number
         mean_label_error, \
@@ -397,24 +398,20 @@ def predict_fn( lexicon ):
         
         predictions, log_probs = _get_output( logits,sequence_length, lexicon )
 
-        print 'predictions = ',predictions
-        
         if lexicon:
-            # CTCWordBeamSearch produces dense BxT result, including trailing
-            # CTC blanks
-            dense_top_pred = predictions[0]
-
-            # Filter trailing blanks to match
-            pred_mask = tf.not_equal(dense_top_pred, logits.shape[2]-1)
-            pred_mask.set_shape([None]) # ?,1 or Tx1. In np .shape is (T,)
-            final_pred = tf.boolean_mask( dense_top_pred, pred_mask, axis=1)
-        else:
-            # tf.nn.ctc_beam_search produces SparseTensor but EstimatorSpec
-            # predictions only takes dense tensors
+            # TFWordBeamSearch produces only a single value,
+            # but its given dense shape is the original sequence length
             final_pred = tf.sparse_to_dense( predictions[0].indices, 
-                                         predictions[0].dense_shape, 
-                                         predictions[0].values, 
-                                         default_value=0 ) 
+                                             predictions[0].values.shape,
+                                             predictions[0].values, 
+                                             default_value=0 ) 
+        else:
+        # tf.nn.ctc_beam_search produces SparseTensor but EstimatorSpec
+        # predictions only takes dense tensors
+            final_pred = tf.sparse_to_dense( predictions[0].indices, 
+                                             predictions[0].dense_shape, 
+                                             predictions[0].values, 
+                                             default_value=0 ) 
         
         return tf.estimator.EstimatorSpec( mode=mode,
                                            predictions={ 'labels': final_pred,
