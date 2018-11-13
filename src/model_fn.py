@@ -244,7 +244,7 @@ def _get_output( rnn_logits, sequence_length, lexicon ):
             # categories should be added to the charset module
             wordChars = chars[1:]
             
-            prediction = word_beam_search_module.word_beam_search(
+            prediction,log_probs = word_beam_search_module.word_beam_search(
                 rnn_probs,
                 sequence_length,
                 beam_width,
@@ -261,8 +261,8 @@ def _get_output( rnn_logits, sequence_length, lexicon ):
             # Reconstruct sparse tensor, removing hacky prepended non-word char
             # CTCWordBeamSearch returns only top match, so convert to list
             predictions = [prediction]  
-            log_probs = tf.constant(0, dtype=tf.float32)#,
-                                    #shape=[rnn_probs.shape[1]] ) # Bx1 (top)
+            #log_probs = tf.constant(0, dtype=tf.float32,
+            #                        shape=[rnn_probs.shape[1]] ) # Bx1 (top)
 	else:
 	    predictions,log_probs = tf.nn.ctc_beam_search_decoder( rnn_logits,
                                                            sequence_length,
@@ -381,20 +381,10 @@ def evaluate_fn( lexicon ):
 def predict_fn( lexicon ):
     """Returns a function that runs the model on the input data 
        (e.g., for validation)"""
-    # Assumes only a single image as input
+
     def predict( features, labels, mode ):
 
-         # Get the appropriate tensors
-        image = features
-        width = tf.size( image[1] )
-
-        # Pre-process the images
-        proc_image = tf.reshape( image,[1,32,-1,1] ) # Make first dim batch
-
-        # Pack the modified image data into a dictionary
-        proc_img_data = {'image': proc_image, 'width': width}
-
-        logits, sequence_length = _get_image_info(proc_img_data, mode)
+        logits, sequence_length = _get_image_info(features, mode)
         
         predictions, log_probs = _get_output( logits,sequence_length, lexicon )
 
@@ -402,7 +392,7 @@ def predict_fn( lexicon ):
             # TFWordBeamSearch produces only a single value,
             # but its given dense shape is the original sequence length
             final_pred = tf.sparse_to_dense( predictions[0].indices, 
-                                             predictions[0].values.shape,
+                                             predictions[0].dense_shape,#values.shape,
                                              predictions[0].values, 
                                              default_value=0 ) 
         else:
