@@ -231,9 +231,11 @@ def _get_output( rnn_logits, sequence_length, lexicon ):
             beam_width = 128
             with open(lexicon) as lexicon_fd:
                 corpus = lexicon_fd.read().encode('utf8')
+
+            rnn_probs = tf.nn.softmax(rnn_logits, axis=2) # decodes in expspace
+
             # CTCWordBeamSearch requires a non-word char. We hack this by
             # prepending a zero-prob " " entry to the rnn_probs
-            rnn_probs = tf.nn.softmax(rnn_logits, dim=2) # decodes in expspace :(
             rnn_probs = tf.pad( rnn_probs,
                                 [[0,0],[0,0],[1,0]], # Add one slice of zeros
                                 mode='CONSTANT',
@@ -261,8 +263,6 @@ def _get_output( rnn_logits, sequence_length, lexicon ):
             # Reconstruct sparse tensor, removing hacky prepended non-word char
             # CTCWordBeamSearch returns only top match, so convert to list
             predictions = [prediction]  
-            #log_probs = tf.constant(0, dtype=tf.float32,
-            #                        shape=[rnn_probs.shape[1]] ) # Bx1 (top)
 	else:
 	    predictions,log_probs = tf.nn.ctc_beam_search_decoder( rnn_logits,
                                                            sequence_length,
@@ -405,6 +405,6 @@ def predict_fn( lexicon ):
         
         return tf.estimator.EstimatorSpec( mode=mode,
                                            predictions={ 'labels': final_pred,
-                                                         'score': log_probs[0] })
+                                                         'score': log_probs })
 
     return predict

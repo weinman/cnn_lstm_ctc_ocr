@@ -25,6 +25,8 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string( 'model','../data/model',
                             """Directory for model checkpoints""" )
+tf.app.flags.DEFINE_string( 'lexicon',None,
+			    """File containing lexicon of image words""" )
 
 tf.app.flags.DEFINE_integer( 'batch_size',2**9,
                              """Eval batch size""" )
@@ -91,11 +93,12 @@ def _get_config():
 def main(argv=None):
   
     # Initialize the classifier
-    classifier = tf.estimator.Estimator( config = _get_config(),
-                                         model_fn=model_fn.evaluate_fn(), 
-                                         model_dir=FLAGS.model,
-                                         params={'continuous_eval': False} )
-    
+    classifier = tf.estimator.Estimator(
+        config= _get_config(),
+        model_fn=model_fn.evaluate_fn( FLAGS.lexicon ), 
+        model_dir=FLAGS.model,
+        params={'continuous_eval': False} )
+
     evaluations = classifier.evaluate( input_fn=_get_input )
     
     print(evaluations)
