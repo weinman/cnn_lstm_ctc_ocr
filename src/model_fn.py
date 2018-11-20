@@ -25,6 +25,10 @@ import pipeline
 
 from lexicon import dictionary_from_file
 
+# Beam search width for prediction and evaluation modes using both the
+# custom, lexicon-driven CTCWordBeamSearch module and the open-lexicon
+# tf.nn.ctc_beam_search_decoder
+_ctc_beam_width = 2**7
 
 def _get_image_info( features, mode ):
     """Calculates the logits and sequence length"""
@@ -228,7 +232,7 @@ def _get_output( rnn_logits, sequence_length, lexicon ):
             # Note: TFWordBeamSearch.so must be in LD_LIBRARY_PATH (on *nix)
             # from github.com/githubharald/CTCWordBeamSearch
             word_beam_search_module = tf.load_op_library('TFWordBeamSearch.so')
-            beam_width = 128
+            beam_width = _ctc_beam_width
             with open(lexicon) as lexicon_fd:
                 corpus = lexicon_fd.read().encode('utf8')
 
@@ -266,7 +270,7 @@ def _get_output( rnn_logits, sequence_length, lexicon ):
 	else:
 	    predictions,log_probs = tf.nn.ctc_beam_search_decoder( rnn_logits,
                                                            sequence_length,
-                                                           beam_width=128,
+                                                           beam_width=_ctc_beam_width,
                                                            top_paths=1,
                                                            merge_repeated=True )
     return predictions, log_probs
