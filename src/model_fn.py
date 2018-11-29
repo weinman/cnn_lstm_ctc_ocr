@@ -112,7 +112,8 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
 
 
 
-def _get_testing( rnn_logits,sequence_length,label,label_length, lexicon ):
+def _get_testing( rnn_logits,sequence_length,label,label_length,
+                  lexicon, lexicon_prior ):
     """Create ops for testing (all scalars): 
        loss: CTC loss function value, 
        label_error:   batch level edit distance on beam search max
@@ -122,7 +123,8 @@ def _get_testing( rnn_logits,sequence_length,label,label_length, lexicon ):
     with tf.name_scope( "train" ):
         loss = model.ctc_loss_layer( rnn_logits,label,sequence_length ) 
     with tf.name_scope( "test" ):
-        predictions,_ = _get_output( rnn_logits, sequence_length, lexicon )
+        predictions,_ = _get_output( rnn_logits, sequence_length,
+                                     lexicon, lexicon_prior )
 
         hypothesis = tf.cast( predictions[0], tf.int32 ) # for edit_distance
 
@@ -221,59 +223,127 @@ def _get_dictionary_tensor( dictionary_path, charset ):
     return tf.sparse_tensor_to_dense( tf.to_int32(
 	dictionary_from_file( dictionary_path, charset )))
 
+def _get_lexicon_output( rnn_logits, sequence_length, lexicon ):
+    """Create lexicon-restricted output ops
+        prediction: Dense BxT tensor of predicted character indices
+        seq_prob: Bx1 tensor of output sequence probabilities
+    """
+    # Note: TFWordBeamSearch.so must be in LD_LIBRARY_PATH (on *nix)
+    # from github.com/githubharald/CTCWordBeamSearch
+    word_beam_search_module = tf.load_op_library('TFWordBeamSearch.so')
+    beam_width = _ctc_beam_width
+    with open(lexicon) as lexicon_fd:
+        corpus = lexicon_fd.read().encode('utf8')
 
-def _get_output( rnn_logits, sequence_length, lexicon ):
-    """Create ops for validation
-       predictions: Results of CTC beam search decoding
-       log_prob: Score of predictions
+    rnn_probs = tf.nn.softmax(rnn_logits, axis=2) # decodes in expspace
+
+    # CTCWordBeamSearch requires a non-word char. We hack this by
+    # prepending a zero-prob " " entry to the rnn_probs
+    rnn_probs = tf.pad( rnn_probs,
+                        [[0,0],[0,0],[1,0]], # Add one slice of zeros
+                        mode='CONSTANT',
+                        constant_values=0.0 )
+    chars = (' '+charset.out_charset).encode('utf8')
+
+    # Assume words can be formed from all chars--if punctuation is added
+    # or numbers (etc) are to be treated differently, more such 
+    # categories should be added to the charset module
+    wordChars = chars[1:]
+            
+    prediction,seq_prob = word_beam_search_module.word_beam_search(
+        rnn_probs,
+        sequence_length,
+        beam_width,
+        'Words', # Use No LM
+        0.0, # Irrelevant: No LM to smooth
+        corpus, # aka lexicon [are unigrams ignored?]
+        chars,
+        wordChars )
+    prediction = prediction - 1 # Remove hacky prepended non-word char
+
+    return prediction, seq_prob
+
+
+def _get_open_output( rnn_logits, sequence_length ):
+    """Create open-vocabulary output ops for validation (testing) and prediction
+       prediction: BxT sparse result of CTC beam search decoding
+       seq_prob: Score of prediction
+    """
+    prediction,log_prob = tf.nn.ctc_beam_search_decoder(
+        rnn_logits,
+        sequence_length,
+        beam_width=_ctc_beam_width,
+        top_paths=1,
+        merge_repeated=True )
+    seq_prob = tf.math.exp(log_prob)
+
+    return prediction, seq_prob
+
+
+def _get_merged_output( lex_prediction, lex_seq_prob,
+                        open_prediction, open_seq_prob, lexicon_prior ):
+    """Create merged output ops based on maximum posterior probobability
+    """
+    
+    # Calculate posterior probability for lexicon versus open prediction
+    seq_joint = tf.concat( [lexicon_prior * lex_seq_prob,
+                            (1-lexicon_prior) * open_seq_prob ],
+                           axis=1 )  # Bx2
+    #seq_post = seq_joint / tf.reduce_sum( seq_joint, axis=1, keepdims=True)
+    # argmax posterior to find most likely prediction
+    seq_class = tf.argmax( seq_joint, axis=1, output_type=tf.int32 )
+    # stack predictions for gathering
+    predictions = tf.stack( [lex_prediction, open_prediction], axis=0) # 2xBxT
+    # pair off classification (first index) and batch element [0,B) for gather
+    indices = tf.stack( [seq_class,
+                         tf.range( tf.shape(seq_class)[0]) ],
+                        axis=1) # Bx2
+    prediction = tf.gather_nd( predictions, indices) # BxT
+    seq_prob = tf.gather_nd( tf.transpose(seq_joint), indices) # Bx1
+
+    return prediction, seq_prob
+
+def _get_output( rnn_logits, sequence_length, lexicon, lexicon_prior ):
+    """Create output ops for validation (testing) and prediction
+       prediction: Result of CTC beam search decoding
+       seq_prob: Score of prediction
     """
     with tf.name_scope("test"):
 	if lexicon:
-            # Note: TFWordBeamSearch.so must be in LD_LIBRARY_PATH (on *nix)
-            # from github.com/githubharald/CTCWordBeamSearch
-            word_beam_search_module = tf.load_op_library('TFWordBeamSearch.so')
-            beam_width = _ctc_beam_width
-            with open(lexicon) as lexicon_fd:
-                corpus = lexicon_fd.read().encode('utf8')
-
-            rnn_probs = tf.nn.softmax(rnn_logits, axis=2) # decodes in expspace
-
-            # CTCWordBeamSearch requires a non-word char. We hack this by
-            # prepending a zero-prob " " entry to the rnn_probs
-            rnn_probs = tf.pad( rnn_probs,
-                                [[0,0],[0,0],[1,0]], # Add one slice of zeros
-                                mode='CONSTANT',
-                                constant_values=0.0 )
-            chars = (' '+charset.out_charset).encode('utf8')
-            # Assume words can be formed from all chars--if punctuation is added
-            # or numbers (etc) are to be treated differently, more such 
-            # categories should be added to the charset module
-            wordChars = chars[1:]
-            
-            prediction,log_probs = word_beam_search_module.word_beam_search(
-                rnn_probs,
-                sequence_length,
-                beam_width,
-                'Words', # Use No LM
-                0.0, # Irrelevant: No LM to smooth
-                corpus, # aka lexicon [are unigrams ignored?]
-                chars,
-                wordChars )
-            prediction = prediction - 1 # Remove hacky prepended non-word char
+            ctc_blank = (rnn_logits.shape[2]-1)
+            lex_prediction,lex_seq_prob = _get_lexicon_output(rnn_logits,
+                                                      sequence_length, lexicon )
+            if lexicon_prior != None:
+                # Need to run both open and closed vocabulary modes
+                open_prediction, open_seq_prob = _get_open_output(
+                    rnn_logits, sequence_length)
+                # Convert top open output prediction to dense values
+                # NOTE: What to do if the sparse result is shorter than T?
+                # Reshape sparse version of open_prediction?
+                open_prediction = tf.cast(
+                    tf.sparse.to_dense(
+                        tf.sparse.reset_shape(
+                            open_prediction[0],
+                            new_shape=tf.shape(lex_prediction) ),
+                        default_value=ctc_blank),
+                    tf.int32)
+                prediction, seq_prob = _get_merged_output(
+                    lex_prediction, lex_seq_prob,
+                    open_prediction, open_seq_prob, lexicon_prior )
+            else:
+                prediction = lex_prediction
+                seq_prob = lex_seq_prob
+                
             # Match tf.nn.ctc_beam_search_decoder outputs: list of sparse
             prediction = tf.contrib.layers.dense_to_sparse(
                 prediction,
-                eos_token=len(chars)-1 ) # Index of CTC blank
-            # Reconstruct sparse tensor, removing hacky prepended non-word char
+                eos_token=ctc_blank )
             # CTCWordBeamSearch returns only top match, so convert to list
-            predictions = [prediction]  
+            prediction = [prediction]
 	else:
-	    predictions,log_probs = tf.nn.ctc_beam_search_decoder( rnn_logits,
-                                                           sequence_length,
-                                                           beam_width=_ctc_beam_width,
-                                                           top_paths=1,
-                                                           merge_repeated=True )
-    return predictions, log_probs
+            prediction, seq_prob = _get_open_output(rnn_logits, sequence_length)
+            
+    return prediction, seq_prob
 
 
 def train_fn( scope, tune_from, learning_rate, 
@@ -302,7 +372,7 @@ def train_fn( scope, tune_from, learning_rate,
     return train
 
 
-def evaluate_fn( lexicon ):
+def evaluate_fn( lexicon, lexicon_prior ):
     """Returns a function that evaluates the model for all batches at once or 
     continuously for one batch"""
 
@@ -319,7 +389,7 @@ def evaluate_fn( lexicon ):
             batch_sequence_error, \
             batch_total_labels, \
             _ = _get_testing( logits,sequence_length,labels,
-                              length, lexicon )
+                              length, lexicon, lexicon_prior )
         
         # Label errors: mean over the batch and updated total number
         mean_label_error, \
@@ -382,7 +452,7 @@ def evaluate_fn( lexicon ):
     return evaluate
 
 
-def predict_fn( lexicon ):
+def predict_fn( lexicon, lexicon_prior ):
     """Returns a function that runs the model on the input data 
        (e.g., for validation)"""
 
@@ -390,7 +460,8 @@ def predict_fn( lexicon ):
 
         logits, sequence_length = _get_image_info(features, mode)
         
-        predictions, log_probs = _get_output( logits,sequence_length, lexicon )
+        predictions, log_probs = _get_output( logits, sequence_length,
+                                              lexicon, lexicon_prior )
 
         if lexicon:
             # TFWordBeamSearch produces only a single value,

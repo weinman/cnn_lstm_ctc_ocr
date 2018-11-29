@@ -36,6 +36,8 @@ tf.app.flags.DEFINE_boolean( 'print_score', False,
                              """Print log probability scores with predictions""" )
 tf.app.flags.DEFINE_string( 'lexicon','',
 			    """File containing lexicon of image words""" )
+tf.app.flags.DEFINE_float( 'lexicon_prior',None,
+			    """Prior bias [0,1] for lexicon word""" )
 
 
 tf.logging.set_verbosity( tf.logging.INFO )
@@ -109,7 +111,8 @@ def main(argv=None):
     
     classifier = tf.estimator.Estimator( config=_get_config(),
                                          model_fn=model_fn.predict_fn(
-                                             FLAGS.lexicon), 
+                                             FLAGS.lexicon,
+                                             FLAGS.lexicon_prior), 
                                          model_dir=FLAGS.model )
     
     predictions = classifier.predict( input_fn=_get_input )
