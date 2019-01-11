@@ -196,12 +196,17 @@ def rnn_layers( features, sequence_length, num_classes ):
         return rnn_logits
     
 
-def ctc_loss_layer( rnn_logits, sequence_labels, sequence_length ):
+def ctc_loss_layer( rnn_logits, sequence_labels, sequence_length,
+                    reduce_mean=True ):
     """Build CTC Loss layer for training"""
-    loss = tf.nn.ctc_loss( sequence_labels, 
-                           rnn_logits, 
-                           sequence_length,
-                           time_major=True, 
-                           ignore_longer_outputs_than_inputs=True )
-    total_loss = tf.reduce_mean( loss )
-    return total_loss
+    losses = tf.nn.ctc_loss( sequence_labels, 
+                             rnn_logits, 
+                             sequence_length,
+                             time_major=True, 
+                             ignore_longer_outputs_than_inputs=True )
+    if (reduce_mean):
+        loss = tf.reduce_mean( losses )
+    else:
+        loss = tf.reduce_sum( losses )
+
+    return loss
