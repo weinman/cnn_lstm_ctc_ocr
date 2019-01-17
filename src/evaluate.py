@@ -161,10 +161,11 @@ def main(argv=None):
                                                         summary_writer)
     
     # Evaluate repeatedly once a new checkpoint is found
-    tf.contrib.training.evaluate_repeatedly(
-        checkpoint_dir=FLAGS.model,eval_ops=update_op, final_ops=value_ops, 
-        hooks = [stop_hook, summary_hook], config=_get_config(), 
-        eval_interval_secs= FLAGS.eval_interval_secs )
+    with tf.control_dependencies([update_op]):
+        tf.contrib.training.evaluate_repeatedly(
+            checkpoint_dir=FLAGS.model,eval_ops=update_op, final_ops=value_ops, 
+            hooks = [stop_hook, summary_hook], config=_get_config(), 
+            eval_interval_secs= FLAGS.eval_interval_secs )
 
 if __name__ == '__main__':
     tf.app.run()   
