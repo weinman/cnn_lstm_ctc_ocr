@@ -17,6 +17,8 @@
 # model_fn.py -- Provides functions necessary for using the Estimator
 #   API to control training, evaluation, and prediction.
 
+from __future__ import print_function
+
 import tensorflow as tf 
 import model
 import mjsynth
@@ -24,6 +26,8 @@ import charset
 import pipeline
 
 from lexicon import dictionary_from_file
+
+
 
 
 def _get_image_info( features, mode ):
@@ -336,16 +340,20 @@ def evaluate_fn( ):
    
 
         # Print the metrics while doing continuous evaluation (evaluate.py) 
-        # Note: tf.Print is identical to tf.identity, except it prints
-        # the list of metrics as a side effect
         if (continuous_eval):
             global_step = tf.train.get_or_create_global_step()
-            mean_sequence_error = tf.Print( mean_sequence_error, 
-                                            [global_step,
-                                             batch_loss,
-                                             mean_label_error,
-                                             mean_sequence_error] ,
-                                            first_n=1)
+            print_output_op = tf.print( [global_step,
+                                         batch_loss,
+                                         mean_label_error,
+                                         mean_sequence_error] )
+            update_op_seq = tf.group( update_op_seq, print_output_op )
+            # TODO: Fix above so means get updated; delete deprecated ver. below
+            #mean_sequence_error = tf.Print( mean_sequence_error, 
+            #                                [global_step,
+            #                                 batch_loss,
+            #                                 mean_label_error,
+            #                                 mean_sequence_error] ,
+            #                                first_n=1)
             
             # Create summaries for the metrics during continuous eval
             tf.summary.scalar( 'loss', tensor=batch_loss,
