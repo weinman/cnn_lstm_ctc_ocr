@@ -91,7 +91,7 @@ def get_data( use_static_data,
 
     # Bucket and batch appropriately
     if boundaries:
-        dataset = dataset.apply( tf.contrib.data.bucket_by_sequence_length(
+        dataset = dataset.apply( tf.data.experimental.bucket_by_sequence_length(
             element_length_func=dpipe.element_length_fn,
             # Create numpy array as follows: [batch_size,...,batch_size]
             bucket_batch_sizes=np.full( len( boundaries ) + 1, 
