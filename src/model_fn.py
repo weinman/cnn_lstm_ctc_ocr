@@ -112,8 +112,9 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
 
 
 
+
 def _get_testing( rnn_logits,sequence_length,label,label_length,
-                  lexicon, lexicon_prior ):
+                  continous_eval, lexicon, lexicon_prior ):
     """Create ops for testing (all scalars): 
        loss: CTC loss function value, 
        label_error:   batch level edit distance on beam search max
@@ -121,7 +122,9 @@ def _get_testing( rnn_logits,sequence_length,label,label_length,
     """
 
     with tf.name_scope( "train" ):
-        loss = model.ctc_loss_layer( rnn_logits,label,sequence_length ) 
+        # Reduce by mean (rather than sum) if doing continuous evaluation
+        batch_loss = model.ctc_loss_layer( rnn_logits,label,sequence_length,
+                                           reduce_mean=continuous_eval) 
     with tf.name_scope( "test" ):
         predictions,_ = _get_output( rnn_logits, sequence_length,
                                      lexicon, lexicon_prior )
@@ -143,8 +146,26 @@ def _get_testing( rnn_logits,sequence_length,label,label_length,
                                              tf.int64 )
         batch_num_labels = tf.cast( batch_num_labels, tf.int64)
         
-    return loss, batch_num_label_errors, batch_num_sequence_errors, \
+    return batch_loss, batch_num_label_errors, batch_num_sequence_errors, \
         batch_num_labels, predictions
+
+
+def _get_loss_ops( batch_loss ):
+    """Calculates the total loss by accumulating for batches and returns
+    the average"""
+
+    var_collections=[tf.GraphKeys.LOCAL_VARIABLES]
+
+    # Variable to tally across batches (all initially zero)
+    total_loss = tf.Variable( 0, trainable=False,
+                              name='total_loss',
+                              dtype=tf.float32,
+                              collections=var_collections )
+
+    # Create the "+=" update op
+    update_op = tf.assign_add( total_loss, batch_loss )
+
+    return total_loss, update_op
 
 
 def _get_label_err_ops( batch_num_label_error, batch_total_labels ):
@@ -384,12 +405,12 @@ def evaluate_fn( lexicon, lexicon_prior ):
         length = features['length']
             
         # Get the predictions
-        loss,\
+        batch_loss,\
             batch_label_error,\
             batch_sequence_error, \
             batch_total_labels, \
-            _ = _get_testing( logits,sequence_length,labels,
-                              length, lexicon, lexicon_prior )
+            _ = _get_testing( logits,sequence_length,labels, length, 
+                              continuous_eval, lexicon, lexicon_prior )
         
         # Label errors: mean over the batch and updated total number
         mean_label_error, \
@@ -405,6 +426,13 @@ def evaluate_fn( lexicon, lexicon_prior ):
             total_num_sequences = _get_seq_err_ops( batch_sequence_error, 
                                                    length )
         
+        # Loss: Accumulated total loss over batches
+        total_loss, update_op_loss   = _get_loss_ops( batch_loss )
+        mean_loss =  tf.truediv( total_loss, 
+                                 tf.cast( total_num_sequences, tf.float32 ),
+                                 name='mean_loss' )    
+   
+
         # Print the metrics while doing continuous evaluation (evaluate.py) 
         # Note: tf.Print is identical to tf.identity, except it prints
         # the list of metrics as a side effect
@@ -412,13 +440,13 @@ def evaluate_fn( lexicon, lexicon_prior ):
             global_step = tf.train.get_or_create_global_step()
             mean_sequence_error = tf.Print( mean_sequence_error, 
                                             [global_step,
-                                             loss,
+                                             batch_loss,
                                              mean_label_error,
                                              mean_sequence_error] ,
                                             first_n=1)
             
             # Create summaries for the metrics during continuous eval
-            tf.summary.scalar( 'loss', tensor=loss,
+            tf.summary.scalar( 'loss', tensor=batch_loss,
                                family='test' )
             tf.summary.scalar( 'label_error', tensor=mean_label_error,
                                family='test' )
@@ -427,19 +455,18 @@ def evaluate_fn( lexicon, lexicon_prior ):
                                family='test' )
             
         # Convert to tensor from Variable in order to pass it to eval_metric_ops
-        total_num_label_errors = tf.convert_to_tensor(
-            total_num_label_errors)
-        total_num_labels = tf.convert_to_tensor(
-            total_num_labels)
-        total_num_sequence_errs = tf.convert_to_tensor(
-            total_num_sequence_errs)
-        total_num_sequences = tf.convert_to_tensor(
-            total_num_sequences)
+        total_num_label_errors  = tf.convert_to_tensor( total_num_label_errors )
+        total_num_labels        = tf.convert_to_tensor( total_num_labels )
+        total_num_sequence_errs = tf.convert_to_tensor( total_num_sequence_errs )
+        total_num_sequences     = tf.convert_to_tensor( total_num_sequences )
+        total_loss              = tf.convert_to_tensor( total_loss )
             
         # All the ops that will be passed to the EstimatorSpec object
         eval_metric_ops = {
+            'mean_loss': ( mean_loss, update_op_loss ),
             'mean_label_error': ( mean_label_error, update_op_label ),
             'mean_sequence_error': ( mean_sequence_error, update_op_seq ),
+            'total_loss': ( total_loss, tf.no_op() ),
             'total_num_label_errors': ( total_num_label_errors, tf.no_op() ),
             'total_num_labels':( total_num_labels, tf.no_op() ),
             'total_num_sequence_errs': ( total_num_sequence_errs, tf.no_op() ),
@@ -447,7 +474,7 @@ def evaluate_fn( lexicon, lexicon_prior ):
         }
         
         return tf.estimator.EstimatorSpec( mode=mode, 
-                                           loss=loss, 
+                                           loss=batch_loss, 
                                            eval_metric_ops=eval_metric_ops )
     return evaluate
 
