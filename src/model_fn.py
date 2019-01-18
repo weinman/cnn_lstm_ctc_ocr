@@ -393,7 +393,7 @@ def train_fn( scope, tune_from, learning_rate,
     return train
 
 
-def evaluate_fn( lexicon, lexicon_prior ):
+def evaluate_fn( lexicon=None, lexicon_prior=None ):
     """Returns a function that evaluates the model for all batches at once or 
     continuously for one batch"""
 
