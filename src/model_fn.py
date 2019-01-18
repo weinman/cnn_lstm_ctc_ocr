@@ -114,7 +114,7 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
 
 
 def _get_testing( rnn_logits,sequence_length,label,label_length,
-                  continous_eval, lexicon, lexicon_prior ):
+                  continuous_eval, lexicon, lexicon_prior ):
     """Create ops for testing (all scalars): 
        loss: CTC loss function value, 
        label_error:   batch level edit distance on beam search max
