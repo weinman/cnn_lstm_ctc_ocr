@@ -24,7 +24,6 @@ import tensorflow as tf
 
 import model_fn
 import charset
-from lexicon import dictionary_from_file
 
 import mjsynth
 
