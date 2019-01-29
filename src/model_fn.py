@@ -23,8 +23,6 @@ import mjsynth
 import charset
 import pipeline
 
-from lexicon import dictionary_from_file
-
 # Beam search width for prediction and evaluation modes using both the
 # custom, lexicon-driven CTCWordBeamSearch module and the open-lexicon
 # tf.nn.ctc_beam_search_decoder
