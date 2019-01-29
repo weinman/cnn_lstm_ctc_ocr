@@ -131,6 +131,7 @@ def rescale_image( image ):
     return image
 
 
+
 def pack_image( image ):
     """
     Pack the image in a dataset into the model_fn-appropriate dictionary with 
@@ -149,3 +150,29 @@ def pack_image( image ):
     label = tf.constant(0)
     
     return features, label
+
+
+def normalize_image( image ):
+    """Normalize: convert uint8 RGB to gray, rescale, and resize image height"""
+
+    # Convert to grayscale
+    image = tf.image.rgb_to_grayscale( image )
+    
+    # Rescale from uint8([0,255]) to float([-0.5,0.5])
+    image = rescale_image( image )
+
+    # Resize to 32 pixels high
+    image_height = tf.cast(tf.shape(image)[0], tf.float64)
+    image_width = tf.shape(image)[1]
+
+    scaled_image_width = tf.cast(
+        tf.round(
+            tf.multiply(tf.cast(image_width,tf.float64),
+                        tf.divide(32.0,image_height)) ),
+        tf.int32)
+
+    image = tf.image.resize_images(image, [32, scaled_image_width],
+                                   tf.image.ResizeMethod.BICUBIC )
+
+    return image
+
