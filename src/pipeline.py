@@ -129,3 +129,23 @@ def rescale_image( image ):
     image = tf.image.convert_image_dtype( image, tf.float32 )
     image = tf.subtract( image, 0.5 )
     return image
+
+
+def pack_image( image ):
+    """
+    Pack the image in a dataset into the model_fn-appropriate dictionary with 
+    features and labels, where features is a dictionary containing  
+    'image' and 'width' values.
+    """
+    width = tf.size( image[1] )
+    
+    # Pre-process the images
+    proc_image = tf.reshape( image,[1,32,-1,1] ) # Make first dim batch
+
+    # Pack the modified image data into a dictionary
+    features = {'image': proc_image, 'width': width}
+
+    # Labels unused for prediction-only validation; construct a NOP value instead
+    label = tf.constant(0)
+    
+    return features, label

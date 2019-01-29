@@ -26,6 +26,7 @@ import model_fn
 import charset
 
 import mjsynth
+import pipeline
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -72,26 +73,8 @@ def _get_input():
     dataset = dataset.map( mjsynth.preprocess_image )
 
     # pack results for model_fn.predict 
-    dataset = dataset.map ( _image_pack )
+    dataset = dataset.map ( pipeline.pack_image )
     return dataset
-
-def _image_pack( image ):
-    """
-    Pack the image in a dataset into the model_fn-appropriate dictionary with 
-    features and labels, where features is a dictionary containing  'image' and 'width' values.
-"""
-    width = tf.size( image[1] )
-    
-    # Pre-process the images
-    proc_image = tf.reshape( image,[1,32,-1,1] ) # Make first dim batch
-
-    # Pack the modified image data into a dictionary
-    features = {'image': proc_image, 'width': width}
-
-    # Labels unused for prediction-only validation; construct a NOP value instead
-    label = tf.constant(0)
-    
-    return features, label
 
 
 def _get_config():
