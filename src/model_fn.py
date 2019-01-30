@@ -501,16 +501,12 @@ def predict_fn( lexicon, lexicon_prior ):
             # the excess, but we set the dense fill value to ctc_blank
             # now to catch any potential errors/bugs downstream later
             ctc_blank = (logits.shape[2]-1)
-            final_pred = tf.sparse_to_dense( predictions[0].indices, 
-                                             predictions[0].dense_shape,
-                                             predictions[0].values, 
+            final_pred = tf.sparse.to_dense( predictions[0],
                                              default_value=ctc_blank ) 
         else:
         # tf.nn.ctc_beam_search produces SparseTensor but EstimatorSpec
         # predictions only takes dense tensors
-            final_pred = tf.sparse_to_dense( predictions[0].indices, 
-                                             predictions[0].dense_shape, 
-                                             predictions[0].values, 
+            final_pred = tf.sparse.to_dense( predictions[0], 
                                              default_value=0 ) 
         
         return tf.estimator.EstimatorSpec( mode=mode,
