@@ -22,6 +22,7 @@ import model
 import mjsynth
 import charset
 import pipeline
+import utils
 
 # Beam search width for prediction and evaluation modes using both the
 # custom, lexicon-driven CTCWordBeamSearch module and the open-lexicon
@@ -248,7 +249,7 @@ def _get_lexicon_output( rnn_logits, sequence_length, lexicon ):
         seq_prob: Bx1 tensor of output sequence probabilities
     """
     # Note: TFWordBeamSearch.so must be in LD_LIBRARY_PATH (on *nix)
-    # from github.com/githubharald/CTCWordBeamSearch
+    # from github.com/weinman/CTCWordBeamSearch branch var_seq_len
     word_beam_search_module = tf.load_op_library('TFWordBeamSearch.so')
     beam_width = _ctc_beam_width
     with open(lexicon) as lexicon_fd:
@@ -303,7 +304,7 @@ def _get_merged_output( lex_prediction, lex_seq_prob,
                         open_prediction, open_seq_prob, lexicon_prior ):
     """Create merged output ops based on maximum posterior probobability
     """
-    
+    # TODO: See whether tf.where with x and y would be faster/easier
     # Calculate posterior probability for lexicon versus open prediction
     seq_joint = tf.concat( [lexicon_prior * lex_seq_prob,
                             (1-lexicon_prior) * open_seq_prob ],
@@ -354,10 +355,15 @@ def _get_output( rnn_logits, sequence_length, lexicon, lexicon_prior ):
                 seq_prob = lex_seq_prob
                 
             # Match tf.nn.ctc_beam_search_decoder outputs: list of sparse
-            prediction = tf.contrib.layers.dense_to_sparse(
+
+            # (1) CTCWordBeamSearch returns a dense tensor matching input 
+            # sequence length (padded with ctc blanks).
+            # We convert to sparse tightly so trailing blanks are trimmed from 
+            # the dense_shape of the resulting SparseTensor
+            prediction = utils.dense_to_sparse_tight(
                 prediction,
                 eos_token=ctc_blank )
-            # CTCWordBeamSearch returns only top match, so convert to list
+            # (2) CTCWordBeamSearch returns only top match, so convert to list
             prediction = [prediction]
 	else:
             prediction, seq_prob = _get_open_output(rnn_logits, sequence_length)
@@ -489,12 +495,16 @@ def predict_fn( lexicon, lexicon_prior ):
                                               lexicon, lexicon_prior )
 
         if lexicon:
-            # TFWordBeamSearch produces only a single value,
-            # but its given dense shape is the original sequence length
+            # TFWordBeamSearch produces only a single value, but its
+            # given dense shape is the original sequence length
+            # dense_to_sparse_tight in_get_output should filter out
+            # the excess, but we set the dense fill value to ctc_blank
+            # now to catch any potential errors/bugs downstream later
+            ctc_blank = (logits.shape[2]-1)
             final_pred = tf.sparse_to_dense( predictions[0].indices, 
-                                             predictions[0].dense_shape,#values.shape,
+                                             predictions[0].dense_shape,
                                              predictions[0].values, 
-                                             default_value=0 ) 
+                                             default_value=ctc_blank ) 
         else:
         # tf.nn.ctc_beam_search produces SparseTensor but EstimatorSpec
         # predictions only takes dense tensors
