@@ -47,7 +47,13 @@ def dense_to_sparse_tight(tensor, eos_token=0,
         indices = tf.where(
             tf.math.not_equal(tensor, tf.constant(eos_token,
                                                 tensor.dtype)))
-        shape = tf.cast(tf.reduce_max(indices,axis=0),dtype=tf.int64) + 1
+        # Need to verify there are *any* indices that are not eos_token
+        # If none, give shape [1,0].
+        shape = tf.cond( tf.not_equal(tf.shape(indices)[0],
+                                      tf.constant(0)), # Found valid indices?
+                         true_fn=lambda: tf.cast(tf.reduce_max(indices,axis=0),\
+                                                 tf.int64) + 1,
+                         false_fn=lambda: tf.cast([1,0], tf.int64) )
         values = tf.gather_nd(tensor, indices)
         outputs = tf.SparseTensor(indices, values, shape)
         return layers_utils.collect_named_outputs(outputs_collections,
