@@ -130,7 +130,7 @@ def get_image_filenames( image_list_filename ):
 
 def get_image( sess, filename ):
     """Given path to an image file, load its data and size"""
-    with tf.gfile.FastGFile( filename, 'r' ) as f:
+    with tf.gfile.GFile( filename, 'rb' ) as f:
         image_data = f.read()
     image = sess.run( jpeg_decoder, feed_dict={ jpeg_data: image_data } )
     height = image.shape[0]
