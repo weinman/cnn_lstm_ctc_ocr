@@ -48,6 +48,58 @@ model details should be easily identifiable in the code.
 The default training mechanism uses the ADAM optimizer with learning
 rate decay.
 
+## Differences from CRNN
+
+### Deeper early convolutions
+
+The original CRNN uses a single 3x3 convolution in the first two conv/pool
+stages, while this network uses a paired sequence of 3x3 kernels. This change
+increases the theoretical receptive field of early stages of the network.
+
+As a tradeoff, we omit the computationally expensive 2x2x512 final
+convolutional layer of CRNN. In its place, this network vertically max pools over the
+remaining three rows of features to collapse to a single 512-dimensional
+feature vector at each horizontal location.
+
+The combination of these changes preserves the theoretical receptive field size
+of the final CNN layer, but reduces the number of convolution parameters to be
+learned by 15%.
+
+### Padding
+
+Another important difference is the lack of zero-padding in the first
+convolutional layer, which can cause spurious strong filter responses around
+the border. By trimming the first convolution to valid regions, this model
+erodes the outermost pixel of values from the response filter maps (reducing
+height from 32 to 30 and reducing the width by two pixels).
+
+This approach seems preferable to requiring the network to learn to ignore
+strong Conv1 responses near the image edge (presumably by weakening the power
+of filters in subsequent convolutional layers).
+
+### Batch normalization
+
+We include batch normalization after each pair of convolutions (i.e., after
+layers 2, 4, 6, and 8 as numbered above). The CRNN does not include batch
+normalization after its first two convolutional stages. Our model therefore
+requires greater computation with an eye toward decreasing the number of
+training iterations required to reach converegence.
+
+### Subsampling/stride
+
+The first two pooling stages of CRNN downsample the feature maps with a stride
+of two in both spatial dimensions. This model instead preserves sequence length
+by downsampling horizontally only after the first pooling stage.
+
+Because the output feature map must have at least one timeslice per character
+predicted, overzealous downsampling can make it impossible to represent/predict
+sequences of very compact or narrow characters. Reducing the horizontal
+downsampling allows this model to recognize words in narrow fonts.
+
+This increase in horizontal resolution does mean the LSTMs must capture more
+information. Hence this model uses 512 hidden units, rather than the 256 used
+by the CRNN. We found this larger number to be necessary for good performance.
+
 # Training
 
 To completely train the model, you will need to download the mjsynth
