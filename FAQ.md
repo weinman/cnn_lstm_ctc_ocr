@@ -1,8 +1,8 @@
-% Frequently Asked Questions
+# Frequently Asked Questions
 
 ## Test results aren't good. What's wrong?
 
-The default training schedule in the provided `Makefile` is likely to get caught in a bad local minimum. See (this comment)[https://github.com/weinman/cnn_lstm_ctc_ocr/issues/42#issuecomment-428791521] and (this example result)[https://github.com/weinman/cnn_lstm_ctc_ocr/issues/42#issuecomment-428793851] in the issues for ideas on how to solve this problem.
+The default training schedule in the provided `Makefile` is likely to get caught in a bad local minimum. See [this comment](https://github.com/weinman/cnn_lstm_ctc_ocr/issues/42#issuecomment-428791521) and [this example result](https://github.com/weinman/cnn_lstm_ctc_ocr/issues/42#issuecomment-428793851) in the issues for ideas on how to solve this problem.
 
 ## Is there a pretrained model available?
 
@@ -16,12 +16,12 @@ The following is a basic example:
 
 ```sh
 # Pre-train the initial model
-python train.py --output=../data/pretrained 
+python train.py --output=../data/pretrained # other flags as desired
 # Tune only LSTMs
-python train.py --output=../data/finetuned --tune_from=../data/pretrained/model.ckpt-NNNNN --tune_scope=rnn 
+python train.py --output=../data/finetuned --tune_from=../data/pretrained/model.ckpt-TTTTT --tune_scope=rnn # other flags as desired
 ```
 
-Note that `NNNN` should be replaced with the step/checkpoint you want to fine tune from.
+Note that `TTTTT` should be replaced with the step/checkpoint you want to fine tune from.
 
-See the code in `model.py` for uses of `tf.variable_scope` for possible restrictions (or how you might add your own).
+See the code in [`model.py`](src/model.py) for uses of `tf.variable_scope` for possible restrictions (or how you might add your own).
 
