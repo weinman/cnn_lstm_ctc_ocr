@@ -24,9 +24,9 @@ import tensorflow as tf
 
 import model_fn
 import charset
-from lexicon import dictionary_from_file
 
 import mjsynth
+import pipeline
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -36,6 +36,8 @@ tf.app.flags.DEFINE_boolean( 'print_score', False,
                              """Print log probability scores with predictions""" )
 tf.app.flags.DEFINE_string( 'lexicon','',
 			    """File containing lexicon of image words""" )
+tf.app.flags.DEFINE_float( 'lexicon_prior',None,
+			    """Prior bias [0,1] for lexicon word""" )
 
 
 tf.logging.set_verbosity( tf.logging.INFO )
@@ -69,7 +71,9 @@ def _get_input():
 
     # mjsynth input images need preprocessing transformation (shape, range)
     dataset = dataset.map( mjsynth.preprocess_image )
-    
+
+    # pack results for model_fn.predict 
+    dataset = dataset.map ( pipeline.pack_image )
     return dataset
 
 
@@ -89,7 +93,8 @@ def main(argv=None):
     
     classifier = tf.estimator.Estimator( config=_get_config(),
                                          model_fn=model_fn.predict_fn(
-                                             FLAGS.lexicon), 
+                                             FLAGS.lexicon,
+                                             FLAGS.lexicon_prior), 
                                          model_dir=FLAGS.model )
     
     predictions = classifier.predict( input_fn=_get_input )
@@ -98,6 +103,7 @@ def main(argv=None):
     while True:
         try:
             results = next( predictions )
+            print 'results =',results
             pred_str = charset.label_to_string( results['labels'] )
             if FLAGS.print_score:
                 print pred_str, results['score'][0]

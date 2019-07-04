@@ -7,13 +7,21 @@ to perform robust word recognition.
 The model is a straightforward adaptation of Shi et al.'s CRNN
 architecture ([arXiv:1507.0571](https://arxiv.org/abs/1507.05717)).
 The provided code downloads and trains using Jaderberg et al.'s
-synthetic data ([IJCV 2016](http://dx.doi.org/10.1007/s11263-015-0823-z)).
+synthetic data ([IJCV 2016](http://dx.doi.org/10.1007/s11263-015-0823-z)), 
+MJSynth.
 
-Currently updated for TensorFlow 1.10.
+Notably, the model achieves a lower test word error rate (1.82%) than
+[CRNN]( https://github.com/bgshih/crnn) when trained and tested on
+case-insensitive, closed vocabulary MJSynth data.
+
+Written for Python 2.7. Currently updated for TensorFlow 1.12
+
+The model and subsequent experiments are more fully described in
+[Weinman et al. (ICDAR 2019)](https://www.cs.grinnell.edu/~weinman/pubs/weinman19deep.pdf)
 
 # Structure
 
-The model as build is a hybrid of Shi et al.'s CRNN architecture
+The model as built is a hybrid of Shi et al.'s CRNN architecture
 (arXiv:1507.0571) and the VGG deep convnet, which reduces the number
 of parameters by stacking pairs of small 3x3 kernels. In addition, the
 pooling is also limited in the horizontal direction to preserve
@@ -160,7 +168,7 @@ model to run the input entered so far).
 There are many command-line options to configure training
 parameters. Run `train.py` or `test.py` with the `--help` flag to see
 them or inspect the scripts. Model parameters are not command-line
-configurable and need to be edited in the code (see `model.py`).
+configurable and need to be edited in the code (see `src/model.py`).
 
 # Dynamic training data
 
@@ -178,12 +186,57 @@ library supports training with dynamically synthesized data. The
 relevant code can be found within
 [MapTextSynthesizer/tensorflow/generator](https://github.com/weinman/MapTextSynthesizer/tree/src/tensorflow/generator)
 
+# Using a lexicon
+
+By default, recognition occurs in "open vocabulary" mode. That is, the
+system observes no constraints on producing the resulting output
+strings. However, it also has a "closed vocabulary" mode that can
+efficiently limit output to a given word list as well as a "mixed
+vocabulary" mode that can produce either a vocabulary from a given
+word list (lexicon) or a non-vocabulary word, depending on the value
+of a prior bias for lexicon words.
+
+Using the closed or mixed vocabulary modes requires additional
+software.  This repository is connected with a 
+[fork of Harald Scheidl's CTCWordBeamSearch](https://github.com/weinman/CTCWordBeamSearch), obtainable as follows:
+
+```bash
+git clone https://github.com/weinman/CTCWordBeamSearch
+cd CTCWordBeamSearch
+git checkout var_seq_len
+```
+
+Then follow the build instructions, which may be as simple as running
+
+```bash
+cd cpp/proj
+./buildTF.sh
+```
+
+To use, make sure `CTCWordBeamSearch/cpp/proj` (the directory
+containing `TFWordBeamSearch.so`) is in the `LD_LIBRARY_PATH` when
+running `test.py` or `validate.py` (in this repository). 
+
 # API Notes
 
 This version uses the TensorFlow
 [Dataset](https://www.tensorflow.org/guide/datasets) for fast
 I/O. Training, testing, validation, and prediction use a custom
 [Estimator](https://www.tensorflow.org/guide/estimators).
+
+# Citing this work
+
+Please cite the following [paper](https://www.cs.grinnell.edu/~weinman/pubs/weinman19deep.pdf) if you use this code in your own research work:
+
+```text
+@inproceedings{ weinman19deep,
+    author = {Jerod Weinman and Ziwen Chen and Ben Gafford and Nathan Gifford and Abyaya Lamsal and Liam Niehus-Staab},
+    title = {Deep Neural Networks for Text Detection and Recognition in Historical Maps},
+    booktitle = {Proc. IAPR International Conference on Document Analysis and Recognition},
+    month = {Sep.},
+    year = {2019},
+    location = {Sydney, Australia}
+} 
 
 # Acknowledgment
 
