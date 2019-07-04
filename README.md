@@ -237,6 +237,7 @@ Please cite the following [paper](https://www.cs.grinnell.edu/~weinman/pubs/wein
     year = {2019},
     location = {Sydney, Australia}
 } 
+```
 
 # Acknowledgment
 
