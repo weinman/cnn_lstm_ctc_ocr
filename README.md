@@ -14,7 +14,8 @@ Notably, the model achieves a lower test word error rate (1.82%) than
 [CRNN]( https://github.com/bgshih/crnn) when trained and tested on
 case-insensitive, closed vocabulary MJSynth data.
 
-Written for Python 2.7. Currently updated for TensorFlow 1.12
+Written for Python 2.7. Requires TensorFlow >=1.10 (deprecation warnings 
+exist for TF>1.10, but the code still works).
 
 The model and subsequent experiments are more fully described in
 [Weinman et al. (ICDAR 2019)](https://www.cs.grinnell.edu/~weinman/pubs/weinman19deep.pdf)
@@ -128,7 +129,7 @@ Note that it may take 4-12 hours to download the complete mjsynth data
 set. A very small set (0.1%) of packaged example data is included; to
 run the small demo, skip the first two lines involving `mjsynth`.
 
-With a Geforce GTX 1080, the demo takes about 20 minutes for the
+With a GeForce GTX 1080, the demo takes about 20 minutes for the
 validation character error to reach 45% (using the default
 parameters); at one hour (roughly 7000 iterations), the validation
 error is just over 20%.
@@ -139,23 +140,23 @@ word error.
 
 # Testing
 
-The evaluate script (`src/evaluate.py`) streams statistics for one batch
-of validation (or evaluation) data. It prints the iteration, evaluation batch
-loss, label error (percentage of characters predicted incorrectly),
-and the sequence error (percentage of words—entire sequences—predicted
-incorrectly).
+The evaluate script (`src/evaluate.py`) streams statistics for one
+batch of validation (or evaluation) data. It prints the iteration,
+evaluation batch loss, label error (percentage of characters predicted
+incorrectly), and the sequence error (percentage of words—entire
+sequences—predicted incorrectly).
 
 The test script (`src/test.py`) tallies statistics, finally
-normalizing for all data. It prints the loss, label error, total number of
-labels, sequence error, total number of sequences, and the label error
-rate and sequence error rate.
+normalizing for all data. It prints the loss, label error, total
+number of labels, sequence error, total number of sequences, and the
+label error rate and sequence error rate.
 
 # Validation
 
-To see the output of a small set of instances, the script
-`validation.py` allows you to load a model and read an image one at a
-time via the process's standard input and print the decoded output for
-each. For example
+To see the output of a small set of instances, the validation script
+(`src/validation.py`) allows you to load a model and read an image one
+at a time via the process's standard input and print the decoded
+output for each. For example
 
     cd src ; python validate.py < ~/paths_to_images.txt
 
@@ -192,7 +193,7 @@ By default, recognition occurs in "open vocabulary" mode. That is, the
 system observes no constraints on producing the resulting output
 strings. However, it also has a "closed vocabulary" mode that can
 efficiently limit output to a given word list as well as a "mixed
-vocabulary" mode that can produce either a vocabulary from a given
+vocabulary" mode that can produce either a vocabulary word from a given
 word list (lexicon) or a non-vocabulary word, depending on the value
 of a prior bias for lexicon words.
 
