@@ -124,7 +124,7 @@ def _extract_metric_update_ops( eval_dict ):
 
 def _get_config():
     """Setup session config to soften device placement"""
-    device_config=tf.ConfigProto(
+    device_config=tf.compat.v1.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False)
 
@@ -136,7 +136,7 @@ def main(argv=None):
     dataset = _get_input()
 
     # Extract input tensors for evaluation
-    iterator = dataset.make_one_shot_iterator()
+    iterator = tf.compat.v1.data.make_one_shot_iterator(dataset)
     features, labels = iterator.get_next()
 
     # Construct the evaluation function 
@@ -155,7 +155,7 @@ def main(argv=None):
     stop_hook = tf.contrib.training.StopAfterNEvalsHook( 1 )
 
     # Create summaries of values added to tf.GraphKeys.SUMMARIES  
-    summary_writer = tf.summary.FileWriter (os.path.join(FLAGS.model,
+    summary_writer = tf.compat.v1.summary.FileWriter (os.path.join(FLAGS.model,
                                                          FLAGS.output))
     summary_hook = tf.contrib.training.SummaryAtEndHook(summary_writer=
                                                         summary_writer)
@@ -167,4 +167,4 @@ def main(argv=None):
         eval_interval_secs= FLAGS.eval_interval_secs )
 
 if __name__ == '__main__':
-    tf.app.run()   
+    tf.compat.v1.app.run()   

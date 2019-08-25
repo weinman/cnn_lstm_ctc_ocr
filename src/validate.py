@@ -40,7 +40,7 @@ tf.app.flags.DEFINE_float( 'lexicon_prior',None,
 			    """Prior bias [0,1] for lexicon word""" )
 
 
-tf.logging.set_verbosity( tf.logging.INFO )
+tf.compat.v1.logging.set_verbosity( tf.compat.v1.logging.INFO )
 
 
 def _get_image( filename ):
@@ -80,7 +80,7 @@ def _get_input():
 def _get_config():
     """Setup session config to soften device placement"""
 
-    device_config=tf.ConfigProto(
+    device_config=tf.compat.v1.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False )
 
@@ -113,4 +113,4 @@ def main(argv=None):
             sys.exit()
     
 if __name__ == '__main__':
-    tf.app.run()
+    tf.compat.v1.app.run()

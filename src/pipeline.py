@@ -76,22 +76,22 @@ def get_data( use_static_data,
                        num_producers )
 
     # Get raw data
-    dataset = dpipe.get_dataset( dpipe_args )
-    dataset = dataset.prefetch( num_buffered_elements )
+    dataset = dpipe.get_dataset(dpipe_args)
+    dataset = dataset.prefetch( int(num_buffered_elements) )
     
     # Preprocess data
     dataset = dataset.map( dpipe.preprocess_fn, 
                            num_parallel_calls=num_threads )
-    dataset = dataset.prefetch( num_buffered_elements )
+    dataset = dataset.prefetch( int(num_buffered_elements) )
     
     # Remove input that doesn't fit necessary specifications
     if filter_fn:
         dataset = dataset.filter( filter_fn )
-        dataset = dataset.prefetch( num_buffered_elements )
+        dataset = dataset.prefetch( int(num_buffered_elements) )
 
     # Bucket and batch appropriately
     if boundaries:
-        dataset = dataset.apply( tf.contrib.data.bucket_by_sequence_length(
+        dataset = dataset.apply( tf.data.experimental.bucket_by_sequence_length(
             element_length_func=dpipe.element_length_fn,
             # Create numpy array as follows: [batch_size,...,batch_size]
             bucket_batch_sizes=np.full( len( boundaries ) + 1, 
@@ -105,7 +105,7 @@ def get_data( use_static_data,
     # Update to account for batching
     num_buffered_elements = num_threads * 2
     
-    dataset = dataset.prefetch( num_buffered_elements )
+    dataset = dataset.prefetch( int(num_buffered_elements) )
     
     # Repeat for num_epochs  
     if num_epochs and use_static_data:
@@ -119,7 +119,7 @@ def get_data( use_static_data,
     # and convert elements to be [features, label]
     dataset = dataset.map( dpipe.postbatch_fn,
                            num_parallel_calls=num_threads )
-    dataset = dataset.prefetch( num_buffered_elements )
+    dataset = dataset.prefetch( int(num_buffered_elements) )
     
     return dataset
 
@@ -138,7 +138,7 @@ def pack_image( image ):
     features and labels, where features is a dictionary containing  
     'image' and 'width' values.
     """
-    width = tf.size( image[1] )
+    width = tf.size( input=image[1] )
     
     # Pre-process the images
     proc_image = tf.reshape( image,[1,32,-1,1] ) # Make first dim batch
@@ -162,8 +162,8 @@ def normalize_image( image ):
     image = rescale_image( image )
 
     # Resize to 32 pixels high
-    image_height = tf.cast(tf.shape(image)[0], tf.float64)
-    image_width = tf.shape(image)[1]
+    image_height = tf.cast(tf.shape(input=image)[0], tf.float64)
+    image_width = tf.shape(input=image)[1]
 
     scaled_image_width = tf.cast(
         tf.round(
@@ -171,7 +171,7 @@ def normalize_image( image ):
                         tf.divide(32.0,image_height)) ),
         tf.int32)
 
-    image = tf.image.resize_images(image, [32, scaled_image_width],
+    image = tf.image.resize(image, [32, scaled_image_width],
                                    tf.image.ResizeMethod.BICUBIC )
 
     return image

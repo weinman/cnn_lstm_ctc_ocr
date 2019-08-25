@@ -23,6 +23,7 @@ import mjsynth
 import charset
 import pipeline
 import utils
+import optimizers as layers
 
 # Beam search width for prediction and evaluation modes using both the
 # custom, lexicon-driven CTCWordBeamSearch module and the open-lexicon
@@ -52,8 +53,8 @@ def _get_init_pretrained( tune_from ):
         return None
     
     # Extract the global variables
-    saver_reader = tf.train.Saver(
-        tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES ) )
+    saver_reader = tf.compat.v1.train.Saver(
+        tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.GLOBAL_VARIABLES ) )
     
     ckpt_path=tune_from
 
@@ -68,44 +69,52 @@ def _get_training( rnn_logits,label,sequence_length, tune_scope,
                    momentum ):
     """Set up training ops"""
 
-    with tf.name_scope( "train" ):
+    with tf.compat.v1.name_scope( "train" ):
 
         if tune_scope:
             scope=tune_scope
         else:            
             scope="convnet|rnn"
 
-        rnn_vars = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES,
+        rnn_vars = tf.compat.v1.get_collection( tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES,
                                        scope=scope )        
 
         loss = model.ctc_loss_layer( rnn_logits,label,sequence_length ) 
 
         # Update batch norm stats [http://stackoverflow.com/questions/43234667]
-        extra_update_ops = tf.get_collection( tf.GraphKeys.UPDATE_OPS )
+        extra_update_ops = tf.compat.v1.get_collection( tf.compat.v1.GraphKeys.UPDATE_OPS )
 
         with tf.control_dependencies( extra_update_ops ):
             
             # Calculate the learning rate given the parameters
-            learning_rate_tensor = tf.train.exponential_decay(
+            learning_rate_tensor = tf.compat.v1.train.exponential_decay(
                 learning_rate,
-                tf.train.get_global_step(),
+                tf.compat.v1.train.get_global_step(),
                 decay_steps,
                 decay_rate,
                 staircase=decay_staircase,
                 name='learning_rate' )
 
-            optimizer = tf.train.AdamOptimizer(
+            optimizer = tf.compat.v1.train.AdamOptimizer(
                 learning_rate=learning_rate_tensor,
                 beta1=momentum )
 
-            train_op = tf.contrib.layers.optimize_loss(
+            #train_op = optimizer.minimize(loss = loss, global_step = tf.compat.v1.train.get_global_step(), var_list=rnn_vars)
+
+            # train_op = optimizer.minimize(
+            #     loss = loss,
+            #     global_step = tf.compat.v1.train.get_global_step(),
+            #     #learning_rate=learning_rate_tensor,
+            #     var_list=rnn_vars
+            #     )
+            train_op = layers.optimize_loss(
                 loss=loss,
-                global_step=tf.train.get_global_step(),
+                global_step=tf.compat.v1.train.get_global_step(),
                 learning_rate=learning_rate_tensor, 
                 optimizer=optimizer,
                 variables=rnn_vars )
 
-            tf.summary.scalar( 'learning_rate', learning_rate_tensor )
+            tf.compat.v1.summary.scalar( 'learning_rate', learning_rate_tensor )
 
     return train_op, loss
 
@@ -120,11 +129,11 @@ def _get_testing( rnn_logits,sequence_length,label,label_length,
        sequence_error: batch level sequence error rate
     """
 
-    with tf.name_scope( "train" ):
+    with tf.compat.v1.name_scope( "train" ):
         # Reduce by mean (rather than sum) if doing continuous evaluation
         batch_loss = model.ctc_loss_layer( rnn_logits,label,sequence_length,
                                            reduce_mean=continuous_eval) 
-    with tf.name_scope( "test" ):
+    with tf.compat.v1.name_scope( "test" ):
         predictions,_ = _get_output( rnn_logits, sequence_length,
                                      lexicon, lexicon_prior )
 
@@ -135,9 +144,9 @@ def _get_testing( rnn_logits,sequence_length,label,label_length,
                                              normalize=False )
 
         # Per-batch summary counts
-        batch_num_label_errors = tf.reduce_sum( num_label_errors)
-        batch_num_sequence_errors = tf.count_nonzero( num_label_errors, axis=0 )
-        batch_num_labels = tf.reduce_sum( label_length )
+        batch_num_label_errors = tf.reduce_sum( input_tensor=num_label_errors)
+        batch_num_sequence_errors = tf.math.count_nonzero( num_label_errors, axis=0 )
+        batch_num_labels = tf.reduce_sum( input_tensor=label_length )
         
         # Wide integer type casts (prefer unsigned, but truediv dislikes those)
         batch_num_label_errors = tf.cast( batch_num_label_errors, tf.int64 )
@@ -153,7 +162,7 @@ def _get_loss_ops( batch_loss ):
     """Calculates the total loss by accumulating for batches and returns
     the average"""
 
-    var_collections=[tf.GraphKeys.LOCAL_VARIABLES]
+    var_collections=[tf.compat.v1.GraphKeys.LOCAL_VARIABLES]
 
     # Variable to tally across batches (all initially zero)
     total_loss = tf.Variable( 0, trainable=False,
@@ -162,7 +171,7 @@ def _get_loss_ops( batch_loss ):
                               collections=var_collections )
 
     # Create the "+=" update op
-    update_op = tf.assign_add( total_loss, batch_loss )
+    update_op = tf.compat.v1.assign_add( total_loss, batch_loss )
 
     return total_loss, update_op
 
@@ -171,7 +180,7 @@ def _get_label_err_ops( batch_num_label_error, batch_total_labels ):
     """Calculates the label error by accumulating for batches and returns
     the average"""
 
-    var_collections=[tf.GraphKeys.LOCAL_VARIABLES]
+    var_collections=[tf.compat.v1.GraphKeys.LOCAL_VARIABLES]
 
     # Variables to tally across batches (all initially zero)
     total_num_label_errors = tf.Variable( 0, trainable=False,
@@ -185,9 +194,9 @@ def _get_label_err_ops( batch_num_label_error, batch_total_labels ):
                                      collections=var_collections )
 
     # Create the "+=" update ops and group together as one
-    update_label_errors    = tf.assign_add( total_num_label_errors,
+    update_label_errors    = tf.compat.v1.assign_add( total_num_label_errors,
                                             batch_num_label_error )
-    update_num_labels     = tf.assign_add( total_num_labels,
+    update_num_labels     = tf.compat.v1.assign_add( total_num_labels,
                                            batch_total_labels )
 
     update_op = tf.group(update_label_errors,update_num_labels )
@@ -205,7 +214,7 @@ def _get_seq_err_ops( batch_num_sequence_errors, label_length ):
     """Calculates the sequence error by accumulating for batches and returns
     the average"""
 
-    var_collections=[tf.GraphKeys.LOCAL_VARIABLES]
+    var_collections=[tf.compat.v1.GraphKeys.LOCAL_VARIABLES]
 
     # Variables to tally across batches (all initially zero)
     total_num_sequence_errors =  tf.Variable( 0, trainable=False,
@@ -219,13 +228,13 @@ def _get_seq_err_ops( batch_num_sequence_errors, label_length ):
                                         collections=var_collections )
 
     # Get the batch size and cast it appropriately
-    batch_size = tf.shape( label_length )[0]
+    batch_size = tf.shape( input=label_length )[0]
     batch_size = tf.cast( batch_size, tf.int64 )
 
     # Create the "+=" update ops and group together as one
-    update_sequence_errors = tf.assign_add( total_num_sequence_errors,
+    update_sequence_errors = tf.compat.v1.assign_add( total_num_sequence_errors,
                                             batch_num_sequence_errors )
-    update_num_sequences   = tf.assign_add( total_num_sequences,
+    update_num_sequences   = tf.compat.v1.assign_add( total_num_sequences,
                                             batch_size )
 
     update_op = tf.group(update_sequence_errors, update_num_sequences)
@@ -240,8 +249,8 @@ def _get_seq_err_ops( batch_num_sequence_errors, label_length ):
 
 
 def _get_dictionary_tensor( dictionary_path, charset ):
-    return tf.sparse_tensor_to_dense( tf.to_int32(
-	dictionary_from_file( dictionary_path, charset )))
+    return tf.sparse.to_dense( tf.cast(
+	dictionary_from_file( dictionary_path, charset ), dtype=tf.int32))
 
 def _get_lexicon_output( rnn_logits, sequence_length, lexicon ):
     """Create lexicon-restricted output ops
@@ -259,8 +268,8 @@ def _get_lexicon_output( rnn_logits, sequence_length, lexicon ):
 
     # CTCWordBeamSearch requires a non-word char. We hack this by
     # prepending a zero-prob " " entry to the rnn_probs
-    rnn_probs = tf.pad( rnn_probs,
-                        [[0,0],[0,0],[1,0]], # Add one slice of zeros
+    rnn_probs = tf.pad( tensor=rnn_probs,
+                        paddings=[[0,0],[0,0],[1,0]], # Add one slice of zeros
                         mode='CONSTANT',
                         constant_values=0.0 )
     chars = (' '+charset.out_charset).encode('utf8')
@@ -289,9 +298,9 @@ def _get_open_output( rnn_logits, sequence_length ):
        prediction: BxT sparse result of CTC beam search decoding
        seq_prob: Score of prediction
     """
-    prediction,log_prob = tf.nn.ctc_beam_search_decoder(
-        rnn_logits,
-        sequence_length,
+    prediction,log_prob = tf.compat.v1.nn.ctc_beam_search_decoder(
+        inputs=rnn_logits,
+        sequence_length=sequence_length,
         beam_width=_ctc_beam_width,
         top_paths=1,
         merge_repeated=True )
@@ -311,15 +320,15 @@ def _get_merged_output( lex_prediction, lex_seq_prob,
                            axis=1 )  # Bx2
     #seq_post = seq_joint / tf.reduce_sum( seq_joint, axis=1, keepdims=True)
     # argmax posterior to find most likely prediction
-    seq_class = tf.argmax( seq_joint, axis=1, output_type=tf.int32 )
+    seq_class = tf.argmax( input=seq_joint, axis=1, output_type=tf.int32 )
     # stack predictions for gathering
     predictions = tf.stack( [lex_prediction, open_prediction], axis=0) # 2xBxT
     # pair off classification (first index) and batch element [0,B) for gather
     indices = tf.stack( [seq_class,
-                         tf.range( tf.shape(seq_class)[0]) ],
+                         tf.range( tf.shape(input=seq_class)[0]) ],
                         axis=1) # Bx2
     prediction = tf.gather_nd( predictions, indices) # BxT
-    seq_prob = tf.gather_nd( tf.transpose(seq_joint), indices) # Bx1
+    seq_prob = tf.gather_nd( tf.transpose(a=seq_joint), indices) # Bx1
 
     return prediction, seq_prob
 
@@ -328,46 +337,46 @@ def _get_output( rnn_logits, sequence_length, lexicon, lexicon_prior ):
        prediction: Result of CTC beam search decoding
        seq_prob: Score of prediction
     """
-    with tf.name_scope("test"):
-	if lexicon:
+    with tf.compat.v1.name_scope("test"):
+        if lexicon:
             ctc_blank = (rnn_logits.shape[2]-1)
             lex_prediction,lex_seq_prob = _get_lexicon_output(rnn_logits,
-                                                      sequence_length, lexicon )
+            sequence_length, lexicon )
             if lexicon_prior != None:
                 # Need to run both open and closed vocabulary modes
                 open_prediction, open_seq_prob = _get_open_output(
-                    rnn_logits, sequence_length)
+                rnn_logits, sequence_length)
                 # Convert top open output prediction to dense values
                 # NOTE: What to do if the sparse result is shorter than T?
                 # Reshape sparse version of open_prediction?
                 open_prediction = tf.cast(
-                    tf.sparse.to_dense(
-                        tf.sparse.reset_shape(
-                            open_prediction[0],
-                            new_shape=tf.shape(lex_prediction) ),
-                        default_value=ctc_blank),
-                    tf.int32)
+                tf.sparse.to_dense(
+                tf.sparse.reset_shape(
+                open_prediction[0],
+                new_shape=tf.shape(input=lex_prediction) ),
+                default_value=ctc_blank),
+                tf.int32)
                 prediction, seq_prob = _get_merged_output(
-                    lex_prediction, lex_seq_prob,
-                    open_prediction, open_seq_prob, lexicon_prior )
+                lex_prediction, lex_seq_prob,
+                open_prediction, open_seq_prob, lexicon_prior )
             else:
                 prediction = lex_prediction
                 seq_prob = lex_seq_prob
-                
-            # Match tf.nn.ctc_beam_search_decoder outputs: list of sparse
 
-            # (1) CTCWordBeamSearch returns a dense tensor matching input 
-            # sequence length (padded with ctc blanks).
-            # We convert to sparse tightly so trailing blanks are trimmed from 
-            # the dense_shape of the resulting SparseTensor
+        # Match tf.nn.ctc_beam_search_decoder outputs: list of sparse
+
+        # (1) CTCWordBeamSearch returns a dense tensor matching input 
+        # sequence length (padded with ctc blanks).
+        # We convert to sparse tightly so trailing blanks are trimmed from 
+        # the dense_shape of the resulting SparseTensor
             prediction = utils.dense_to_sparse_tight(
-                prediction,
-                eos_token=ctc_blank )
+            prediction,
+            eos_token=ctc_blank )
             # (2) CTCWordBeamSearch returns only top match, so convert to list
             prediction = [prediction]
-	else:
+        else:
             prediction, seq_prob = _get_open_output(rnn_logits, sequence_length)
-            
+
     return prediction, seq_prob
 
 
@@ -387,7 +396,7 @@ def train_fn( scope, tune_from, learning_rate,
         
         # Initialize weights from a pre-trained model
         # NOTE: Does not work when num_gpus>1, cf. tensorflow issue 21615.
-        scaffold = tf.train.Scaffold( init_fn=
+        scaffold = tf.compat.v1.train.Scaffold( init_fn=
                                       _get_init_pretrained( tune_from ) )
 
         return tf.estimator.EstimatorSpec( mode=mode, 
@@ -441,8 +450,8 @@ def evaluate_fn( lexicon=None, lexicon_prior=None ):
         # Note: tf.Print is identical to tf.identity, except it prints
         # the list of metrics as a side effect
         if (continuous_eval):
-            global_step = tf.train.get_or_create_global_step()
-            mean_sequence_error = tf.Print( mean_sequence_error, 
+            global_step = tf.compat.v1.train.get_or_create_global_step()
+            mean_sequence_error = tf.compat.v1.Print( mean_sequence_error, 
                                             [global_step,
                                              batch_loss,
                                              mean_label_error,
@@ -450,20 +459,20 @@ def evaluate_fn( lexicon=None, lexicon_prior=None ):
                                             first_n=1)
             
             # Create summaries for the metrics during continuous eval
-            tf.summary.scalar( 'loss', tensor=batch_loss,
+            tf.compat.v1.summary.scalar( 'loss', tensor=batch_loss,
                                family='test' )
-            tf.summary.scalar( 'label_error', tensor=mean_label_error,
+            tf.compat.v1.summary.scalar( 'label_error', tensor=mean_label_error,
                                family='test' )
-            tf.summary.scalar( 'sequence_error',
+            tf.compat.v1.summary.scalar( 'sequence_error',
                                tensor=mean_sequence_error,
                                family='test' )
             
         # Convert to tensor from Variable in order to pass it to eval_metric_ops
-        total_num_label_errors  = tf.convert_to_tensor( total_num_label_errors )
-        total_num_labels        = tf.convert_to_tensor( total_num_labels )
-        total_num_sequence_errs = tf.convert_to_tensor( total_num_sequence_errs )
-        total_num_sequences     = tf.convert_to_tensor( total_num_sequences )
-        total_loss              = tf.convert_to_tensor( total_loss )
+        total_num_label_errors  = tf.convert_to_tensor( value=total_num_label_errors )
+        total_num_labels        = tf.convert_to_tensor( value=total_num_labels )
+        total_num_sequence_errs = tf.convert_to_tensor( value=total_num_sequence_errs )
+        total_num_sequences     = tf.convert_to_tensor( value=total_num_sequences )
+        total_loss              = tf.convert_to_tensor( value=total_loss )
             
         # All the ops that will be passed to the EstimatorSpec object
         eval_metric_ops = {
