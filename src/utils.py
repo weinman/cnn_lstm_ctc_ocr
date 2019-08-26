@@ -29,7 +29,6 @@ import tensorflow as tf
 # available at http://www.apache.org/licenses/LICENSE-2.0, while the
 # derivative work is licensed under GPLv3, to the maximum extent warranted by
 # the original license.
-from tensorflow.contrib.layers.python.layers import utils as layers_utils
 
 def dense_to_sparse_tight(tensor, eos_token=0,
                           outputs_collections=None, scope=None):
@@ -42,16 +41,16 @@ def dense_to_sparse_tight(tensor, eos_token=0,
      outputs_collections: Collection to add the outputs.
      scope: Optional scope for name_scope.
     """
-    with tf.variable_scope(scope, 'dense_to_sparse_tight', [tensor]) as sc:
-        tensor = tf.convert_to_tensor(tensor)
-        indices = tf.where(
+    with tf.compat.v1.variable_scope(scope, 'dense_to_sparse_tight', [tensor]) as sc:
+        tensor = tf.convert_to_tensor(value=tensor)
+        indices = tf.compat.v1.where(
             tf.math.not_equal(tensor, tf.constant(eos_token,
                                                 tensor.dtype)))
         # Need to verify there are *any* indices that are not eos_token
         # If none, give shape [1,0].
-        shape = tf.cond( tf.not_equal(tf.shape(indices)[0],
+        shape = tf.cond( pred=tf.not_equal(tf.shape(input=indices)[0],
                                       tf.constant(0)), # Found valid indices?
-                         true_fn=lambda: tf.cast(tf.reduce_max(indices,axis=0),\
+                         true_fn=lambda: tf.cast(tf.reduce_max(input_tensor=indices,axis=0),\
                                                  tf.int64) + 1,
                          false_fn=lambda: tf.cast([1,0], tf.int64) )
         values = tf.gather_nd(tensor, indices)

@@ -29,7 +29,7 @@ The Example proto contains the following fields:
   image/labels: list containing the sequence labels for the image text
   image/text: string specifying the human-readable version of the text
 """
-jpeg_data = tf.placeholder( dtype=tf.string )
+jpeg_data = tf.compat.v1.placeholder( dtype=tf.string )
 jpeg_decoder = tf.image.decode_jpeg( jpeg_data,channels=1 )
 
 kernel_sizes = [3,3,3,3,3,3] # CNN kernels for image reduction
@@ -57,9 +57,9 @@ seq_lens = [calc_seq_len( w ) for w in range( 1024 )]
 def gen_data( input_base_dir, image_list_filename, output_filebase, 
               num_shards=1000, start_shard=0 ):
     """ Generate several shards worth of TFRecord data """
-    session_config = tf.ConfigProto()
+    session_config = tf.compat.v1.ConfigProto()
     session_config.gpu_options.allow_growth=True
-    sess = tf.Session( config=session_config )
+    sess = tf.compat.v1.Session( config=session_config )
     image_filenames = get_image_filenames( 
         os.path.join( input_base_dir,
                       image_list_filename ) )
@@ -76,15 +76,15 @@ def gen_data( input_base_dir, image_list_filename, output_filebase,
         out_filename = output_filebase+'-'+(shard_format % i)+'.tfrecord'
         if os.path.isfile( out_filename ): # Don't recreate data if restarting
             continue
-        print str( i ), 'of', str( num_shards ),\
-            '[', str( start ), ':', str( end ), ']', out_filename
+        print (str( i ), 'of', str( num_shards ),\
+            '[', str( start ), ':', str( end ), ']', out_filename)
         gen_shard( sess, input_base_dir, 
                    image_filenames[start:end], out_filename )
 
     # Clean up writing last shard
     start = num_shards * images_per_shard
     out_filename = output_filebase+'-'+(shard_format % num_shards)+'.tfrecord'
-    print str(i),'of',str(num_shards),'[',str(start),':]',out_filename
+    print (str(i),'of',str(num_shards),'[',str(start),':]',out_filename)
     gen_shard(sess, input_base_dir, image_filenames[start:], out_filename)
 
     sess.close()
@@ -92,7 +92,7 @@ def gen_data( input_base_dir, image_list_filename, output_filebase,
     
 def gen_shard( sess, input_base_dir, image_filenames, output_filename ):
     """Create a TFRecord file from a list of image filenames"""
-    writer = tf.python_io.TFRecordWriter( output_filename )
+    writer = tf.io.TFRecordWriter( output_filename )
     
     for filename in image_filenames:
         path_filename = os.path.join( input_base_dir, filename )
@@ -130,7 +130,7 @@ def get_image_filenames( image_list_filename ):
 
 def get_image( sess, filename ):
     """Given path to an image file, load its data and size"""
-    with tf.gfile.GFile( filename, 'rb' ) as f:
+    with tf.io.gfile.GFile( filename, 'rb' ) as f:
         image_data = f.read()
     image = sess.run( jpeg_decoder, feed_dict={ jpeg_data: image_data } )
     height = image.shape[0]

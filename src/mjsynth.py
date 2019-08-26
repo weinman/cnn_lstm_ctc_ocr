@@ -57,7 +57,7 @@ def get_dataset( args ):
     
     dataset = tf.data.TFRecordDataset( ds_filenames, 
                                        num_parallel_reads=num_threads,
-                                       buffer_size=buffer_sz )
+                                       buffer_size=int(buffer_sz) )
     return dataset
 
 
@@ -65,20 +65,20 @@ def preprocess_fn( data ):
     """Parse the elements of the dataset"""
 
     feature_map = {
-        'image/encoded'  :   tf.FixedLenFeature( [], dtype=tf.string, 
+        'image/encoded'  :   tf.io.FixedLenFeature( [], dtype=tf.string, 
                                                  default_value='' ),
-        'image/labels'   :   tf.VarLenFeature( dtype=tf.int64 ), 
-        'image/width'    :   tf.FixedLenFeature( [1], dtype=tf.int64,
+        'image/labels'   :   tf.io.VarLenFeature( dtype=tf.int64 ), 
+        'image/width'    :   tf.io.FixedLenFeature( [1], dtype=tf.int64,
                                                  default_value=1 ),
-        'image/filename' :   tf.FixedLenFeature( [], dtype=tf.string,
+        'image/filename' :   tf.io.FixedLenFeature( [], dtype=tf.string,
                                                  default_value='' ),
-        'text/string'    :   tf.FixedLenFeature( [], dtype=tf.string,
+        'text/string'    :   tf.io.FixedLenFeature( [], dtype=tf.string,
                                                  default_value='' ),
-        'text/length'    :   tf.FixedLenFeature( [1], dtype=tf.int64,
+        'text/length'    :   tf.io.FixedLenFeature( [1], dtype=tf.int64,
                                                  default_value=1 )
     }
     
-    features = tf.parse_single_example( data, feature_map )
+    features = tf.io.parse_single_example( serialized=data, features=feature_map )
     
     # Initialize fields according to feature map
 
@@ -86,7 +86,7 @@ def preprocess_fn( data ):
     image = tf.image.decode_jpeg( features['image/encoded'], channels=1 ) 
 
     width = tf.cast( features['image/width'], tf.int32 ) # for ctc_loss
-    label = tf.serialize_sparse( features['image/labels'] ) # for batching
+    label = tf.compat.v1.serialize_sparse( sp_input=features['image/labels'] ) # for batching
     length = features['text/length']
     text = features['text/string']
 
@@ -104,7 +104,7 @@ def postbatch_fn( image, width, label, length, text ):
        Dataset's iterator output"""
 
     # Batching is complete, so now we can re-sparsify our labels for ctc_loss
-    label = tf.cast( tf.deserialize_many_sparse( label, tf.int64 ),
+    label = tf.cast( tf.io.deserialize_many_sparse( label, tf.int64 ),
                      tf.int32 )
     
     # Format relevant features for estimator ingestion
@@ -122,7 +122,7 @@ def _get_filenames( base_dir, file_patterns=['*.tfrecord'] ):
     """Get a list of record files"""
     
     # List of lists ...
-    data_files = [tf.gfile.Glob( os.path.join( base_dir, file_pattern ) )
+    data_files = [tf.io.gfile.glob( os.path.join( base_dir, file_pattern ) )
                   for file_pattern in file_patterns]
     # flatten
     data_files = [data_file for sublist in data_files for data_file in sublist]
