@@ -28,15 +28,15 @@ import charset
 import mjsynth
 import pipeline
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = tf.compat.v1.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string( 'model','../data/model',
+tf.compat.v1.app.flags.DEFINE_string( 'model','../data/model',
                             """Directory for model checkpoints""" )
-tf.app.flags.DEFINE_boolean( 'print_score', False,
+tf.compat.v1.app.flags.DEFINE_boolean( 'print_score', False,
                              """Print log probability scores with predictions""" )
-tf.app.flags.DEFINE_string( 'lexicon','',
+tf.compat.v1.app.flags.DEFINE_string( 'lexicon','',
 			    """File containing lexicon of image words""" )
-tf.app.flags.DEFINE_float( 'lexicon_prior',None,
+tf.compat.v1.app.flags.DEFINE_float( 'lexicon_prior',None,
 			    """Prior bias [0,1] for lexicon word""" )
 
 
@@ -46,9 +46,9 @@ tf.compat.v1.logging.set_verbosity( tf.compat.v1.logging.INFO )
 def _get_image( filename ):
     """Load image data for placement in graph"""
 
-    image = Image.open( filename ) 
+    image = Image.open( filename )
     image = np.array( image )
-    # in mjsynth, all three channels are the same in these grayscale-cum-RGB data
+    # in mjsynth, all three channels are the same in these grayscale-cum-RGB data  
     image = image[:,:,:1] # so just extract first channel, preserving 3D shape
 
     return image
@@ -58,7 +58,7 @@ def _get_input():
     """Create a dataset of images by reading from stdin"""
 
     # Eliminate any trailing newline from filename
-    image_data = _get_image( raw_input().rstrip() )
+    image_data = _get_image( input().rstrip() )
 
     # Initializing the dataset with one image
     dataset = tf.data.Dataset.from_tensors( image_data )
@@ -70,7 +70,7 @@ def _get_input():
         dataset = dataset.concatenate( temp_dataset )
 
     # mjsynth input images need preprocessing transformation (shape, range)
-    dataset = dataset.map( mjsynth.preprocess_image )
+    dataset = dataset.map( pipeline.normalize_image )
 
     # pack results for model_fn.predict 
     dataset = dataset.map ( pipeline.pack_image )
@@ -83,6 +83,8 @@ def _get_config():
     device_config=tf.compat.v1.ConfigProto(
         allow_soft_placement=True, 
         log_device_placement=False )
+
+    device_config.gpu_options.allow_growth = True
 
     custom_config = tf.estimator.RunConfig( session_config=device_config ) 
 
@@ -103,12 +105,12 @@ def main(argv=None):
     while True:
         try:
             results = next( predictions )
-            print 'results =',results
+            print ('results =',results)
             pred_str = charset.label_to_string( results['labels'] )
             if FLAGS.print_score:
-                print pred_str, results['score'][0]
+                print (pred_str, results['score'][0])
             else:
-                print pred_str
+                print (pred_str)
         except StopIteration:
             sys.exit()
     

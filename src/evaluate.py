@@ -22,44 +22,47 @@
 import os
 import tensorflow as tf
 from tensorflow.python.ops import control_flow_ops
+import evaluation as evaluation
 import six
 import model_fn
 import pipeline
 import filters
 
+tf.compat.v1.disable_eager_execution()
+
 # Filters out information to just show a stream of results
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = tf.compat.v1.app.flags.FLAGS
 
 
-tf.app.flags.DEFINE_integer( 'batch_size',2**9,
+tf.compat.v1.app.flags.DEFINE_integer( 'batch_size',2**9,
                              """Eval batch size""" )
-tf.app.flags.DEFINE_integer('eval_interval_secs', 120,
+tf.compat.v1.app.flags.DEFINE_integer('eval_interval_secs', 120,
                              """Time between test runs""")
 
-tf.app.flags.DEFINE_string( 'model','../data/model',
+tf.compat.v1.app.flags.DEFINE_string( 'model','../data/model',
                             """Directory for event logs and checkpoints""" )
-tf.app.flags.DEFINE_string( 'output','test',
+tf.compat.v1.app.flags.DEFINE_string( 'output','test',
                             """Sub-directory of model for test summary events""" )
 
-tf.app.flags.DEFINE_string( 'test_path','../data/',
+tf.compat.v1.app.flags.DEFINE_string( 'test_path','../data/',
                             """Base directory for test/validation data""" )
-tf.app.flags.DEFINE_string( 'filename_pattern','val/words-*',
+tf.compat.v1.app.flags.DEFINE_string( 'filename_pattern','val/words-*',
                             """File pattern for input data""" )
-tf.app.flags.DEFINE_integer( 'num_input_threads',4,
+tf.compat.v1.app.flags.DEFINE_integer( 'num_input_threads',4,
                              """Number of readers for input data""" )
 
-tf.app.flags.DEFINE_integer('min_image_width',None,
+tf.compat.v1.app.flags.DEFINE_integer('min_image_width',None,
                             """Minimum allowable input image width""")
-tf.app.flags.DEFINE_integer('max_image_width',None,
+tf.compat.v1.app.flags.DEFINE_integer('max_image_width',None,
                             """Maximum allowable input image width""")
-tf.app.flags.DEFINE_integer('min_string_length',None,
+tf.compat.v1.app.flags.DEFINE_integer('min_string_length',None,
                             """Minimum allowable input string length""")
-tf.app.flags.DEFINE_integer('max_string_length',None,
+tf.compat.v1.app.flags.DEFINE_integer('max_string_length',None,
                             """Maximum allowable input string_length""")
 
-tf.app.flags.DEFINE_boolean('bucket_data',False,
+tf.compat.v1.app.flags.DEFINE_boolean('bucket_data',False,
                             """Bucket training data by width for efficiency""")
 
 
@@ -152,16 +155,16 @@ def main(argv=None):
         estimator_spec.eval_metric_ops)
   
     # Specify to evaluate N number of batches (in this case N==1)
-    stop_hook = tf.contrib.training.StopAfterNEvalsHook( 1 )
+    stop_hook = evaluation._StopAfterNEvalsHook( 1 )
 
     # Create summaries of values added to tf.GraphKeys.SUMMARIES  
     summary_writer = tf.compat.v1.summary.FileWriter (os.path.join(FLAGS.model,
                                                          FLAGS.output))
-    summary_hook = tf.contrib.training.SummaryAtEndHook(summary_writer=
+    summary_hook = evaluation.SummaryAtEndHook(summary_writer=
                                                         summary_writer)
     
     # Evaluate repeatedly once a new checkpoint is found
-    tf.contrib.training.evaluate_repeatedly(
+    evaluation.evaluate_repeatedly(
         checkpoint_dir=FLAGS.model,eval_ops=update_op, final_ops=value_ops, 
         hooks = [stop_hook, summary_hook], config=_get_config(), 
         eval_interval_secs= FLAGS.eval_interval_secs )

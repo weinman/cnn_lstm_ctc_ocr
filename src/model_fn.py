@@ -165,7 +165,7 @@ def _get_loss_ops( batch_loss ):
     var_collections=[tf.compat.v1.GraphKeys.LOCAL_VARIABLES]
 
     # Variable to tally across batches (all initially zero)
-    total_loss = tf.Variable( 0, trainable=False,
+    total_loss = tf.compat.v1.Variable( 0, trainable=False,
                               name='total_loss',
                               dtype=tf.float32,
                               collections=var_collections )
@@ -183,12 +183,12 @@ def _get_label_err_ops( batch_num_label_error, batch_total_labels ):
     var_collections=[tf.compat.v1.GraphKeys.LOCAL_VARIABLES]
 
     # Variables to tally across batches (all initially zero)
-    total_num_label_errors = tf.Variable( 0, trainable=False,
+    total_num_label_errors = tf.compat.v1.Variable( 0, trainable=False,
                                           name='total_num_label_errors',
                                           dtype=tf.int64,
                                           collections=var_collections )
 
-    total_num_labels =  tf.Variable( 0, trainable=False,
+    total_num_labels =  tf.compat.v1.Variable( 0, trainable=False,
                                      name='total_num_labels',
                                      dtype=tf.int64,
                                      collections=var_collections )
@@ -217,12 +217,12 @@ def _get_seq_err_ops( batch_num_sequence_errors, label_length ):
     var_collections=[tf.compat.v1.GraphKeys.LOCAL_VARIABLES]
 
     # Variables to tally across batches (all initially zero)
-    total_num_sequence_errors =  tf.Variable( 0, trainable=False,
+    total_num_sequence_errors =  tf.compat.v1.Variable( 0, trainable=False,
                                               name='total_num_sequence_errors',
                                               dtype=tf.int64,
                                               collections=var_collections )
 
-    total_num_sequences =  tf.Variable( 0, trainable=False,
+    total_num_sequences =  tf.compat.v1.Variable( 0, trainable=False,
                                         name='total_num_sequences',
                                         dtype=tf.int64,
                                         collections=var_collections )

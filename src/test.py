@@ -21,32 +21,32 @@ import pipeline
 import filters
 import model_fn
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = tf.compat.v1.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string( 'model','../data/model',
+tf.compat.v1.app.flags.DEFINE_string( 'model','../data/model',
                             """Directory for model checkpoints""" )
-tf.app.flags.DEFINE_string( 'lexicon',None,
+tf.compat.v1.app.flags.DEFINE_string( 'lexicon',None,
 			    """File containing lexicon of image words""" )
-tf.app.flags.DEFINE_float( 'lexicon_prior',None,
+tf.compat.v1.app.flags.DEFINE_float( 'lexicon_prior',None,
 			    """Prior bias [0,1] for lexicon word""" )
 
-tf.app.flags.DEFINE_integer( 'batch_size',2**9,
+tf.compat.v1.app.flags.DEFINE_integer( 'batch_size',2**9,
                              """Eval batch size""" )
 
-tf.app.flags.DEFINE_string( 'test_path','../data/',
+tf.compat.v1.app.flags.DEFINE_string( 'test_path','../data/',
                             """Base directory for test/validation data""" )
-tf.app.flags.DEFINE_string( 'filename_pattern','test/words-*',
+tf.compat.v1.app.flags.DEFINE_string( 'filename_pattern','test/words-*',
                             """File pattern for test input data""" )
-tf.app.flags.DEFINE_integer( 'num_input_threads',4,
+tf.compat.v1.app.flags.DEFINE_integer( 'num_input_threads',4,
                              """Number of readers for input data""" )
 
-tf.app.flags.DEFINE_integer('min_image_width',None,
+tf.compat.v1.app.flags.DEFINE_integer('min_image_width',None,
                             """Minimum allowable input image width""")
-tf.app.flags.DEFINE_integer('max_image_width',None,
+tf.compat.v1.app.flags.DEFINE_integer('max_image_width',None,
                             """Maximum allowable input image width""")
-tf.app.flags.DEFINE_integer('min_string_length',None,
+tf.compat.v1.app.flags.DEFINE_integer('min_string_length',None,
                             """Minimum allowable input string length""")
-tf.app.flags.DEFINE_integer('max_string_length',None,
+tf.compat.v1.app.flags.DEFINE_integer('max_string_length',None,
                             """Maximum allowable input string_length""")
 
 

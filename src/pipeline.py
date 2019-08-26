@@ -100,7 +100,7 @@ def get_data( use_static_data,
     else:
         # Dynamically pad batches to match largest in batch
         dataset = dataset.padded_batch( batch_size, 
-                                        padded_shapes=dataset.output_shapes )
+                                        padded_shapes=tf.compat.v1.data.get_output_shapes(dataset))
     
     # Update to account for batching
     num_buffered_elements = num_threads * 2
@@ -156,7 +156,7 @@ def normalize_image( image ):
     """Normalize: convert uint8 RGB to gray, rescale, and resize image height"""
 
     # Convert to grayscale
-    image = tf.image.rgb_to_grayscale( image )
+    #image = tf.image.rgb_to_grayscale( image )
     
     # Rescale from uint8([0,255]) to float([-0.5,0.5])
     image = rescale_image( image )
