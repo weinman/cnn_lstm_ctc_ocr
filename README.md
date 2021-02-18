@@ -18,7 +18,7 @@ Written for Python 2.7. Requires TensorFlow >=1.10 (deprecation warnings
 exist for TF>1.10, but the code still works).
 
 The model and subsequent experiments are more fully described in
-[Weinman et al. (ICDAR 2019)](https://www.cs.grinnell.edu/~weinman/pubs/weinman19deep.pdf)
+[Weinman et al. (ICDAR 2019)](https://weinman.cs.grinnell.edu/pubs/weinman19deep.pdf)
 
 # Structure
 
@@ -138,6 +138,15 @@ With the full training data, by one million iterations the model
 typically converges to around 5% training character error and 27.5%
 word error.
 
+## Checkpoints
+
+[Pre-trained model checkpoints](http://hdl.handle.net/11084/23328) at
+DOI:[11084/23328](http://hdl.handle.net/11084/23328) are used to
+produce results in the following paper:
+
+> Weinman, J. et al. (2019) Deep Neural Networks for Text Detection
+> and Recognition in Historical Maps. In Proc. ICDAR.
+
 # Testing
 
 The evaluate script (`src/evaluate.py`) streams statistics for one
@@ -220,14 +229,14 @@ running `test.py` or `validate.py` (in this repository).
 
 # API Notes
 
-This version uses the TensorFlow
+This version uses the TensorFlow (v1.14)
 [Dataset](https://www.tensorflow.org/guide/datasets) for fast
 I/O. Training, testing, validation, and prediction use a custom
 [Estimator](https://www.tensorflow.org/guide/estimators).
 
 # Citing this work
 
-Please cite the following [paper](https://www.cs.grinnell.edu/~weinman/pubs/weinman19deep.pdf) if you use this code in your own research work:
+Please cite the following [paper](https://weinman.cs.grinnell.edu/pubs/weinman19deep.pdf) if you use this code in your own research work:
 
 ```text
 @inproceedings{ weinman19deep,
@@ -236,7 +245,8 @@ Please cite the following [paper](https://www.cs.grinnell.edu/~weinman/pubs/wein
     booktitle = {Proc. IAPR International Conference on Document Analysis and Recognition},
     month = {Sep.},
     year = {2019},
-    location = {Sydney, Australia}
+    location = {Sydney, Australia},
+    doi = {10.1109/ICDAR.2019.00149}
 } 
 ```
 
