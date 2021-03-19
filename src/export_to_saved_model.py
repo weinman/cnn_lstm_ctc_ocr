@@ -24,12 +24,12 @@ import os
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string( 'ckpt_path','/media/igor/externaldrive/Alice/Ultron2/src/trained_models/best/',
+tf.app.flags.DEFINE_string( 'ckpt_path','/media/path/to/models/',
                             """Directory for model checkpoints""" )
 tf.app.flags.DEFINE_string( 'checkpoint','model.ckpt-73152',
                             """The checkpoint to export. Just the name of the checkpoint, 
                             no path needed. Exemple: 'model.ckpt-104976'""" )
-tf.app.flags.DEFINE_string( 'export_dir','/media/igor/externaldrive/Alice/Ultron2/src/saved_model/',
+tf.app.flags.DEFINE_string( 'export_dir','/media/path/to/where/to/export/saved_model/',
                             """Path to the directory where SavedModel is to be exported""" )
 tf.app.flags.DEFINE_string( 'lexicon','',
                             """File containing lexicon of image words""" )

@@ -41,7 +41,7 @@ tf.app.flags.DEFINE_string( 'model_spec_name','crnn',
                             """Name of the saved models batch as it is referenced in the "tf_server.conf""" )
 tf.app.flags.DEFINE_integer( 'model_version',1616119579,
                             """SavedModel version to call""" )
-tf.app.flags.DEFINE_string( 'image_path','/media/igor/externaldrive/ocr_training_data/d_plus/images/Primary_34830.png',
+tf.app.flags.DEFINE_string( 'image_path','/media/test/images/test_image.png',
                             """Image to be used as input for inference/prediction""" )
 tf.app.flags.DEFINE_integer( 'image_base_height',32,
                             """The height for all tensors to be reshaped to""" )
