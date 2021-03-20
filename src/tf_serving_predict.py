@@ -45,10 +45,6 @@ tf.app.flags.DEFINE_string( 'image_path','/media/test/images/test_image.png',
                             """Image to be used as input for inference/prediction""" )
 tf.app.flags.DEFINE_integer( 'image_base_height',32,
                             """The height for all tensors to be reshaped to""" )
-tf.app.flags.DEFINE_string( 'lexicon','',
-			                """File containing lexicon of image words""" )
-tf.app.flags.DEFINE_float( 'lexicon_prior',None,
-			                """Prior bias [0,1] for lexicon word""" )
 
 tf.logging.set_verbosity( tf.logging.INFO )
 
