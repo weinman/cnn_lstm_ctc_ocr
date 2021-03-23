@@ -173,6 +173,28 @@ Alternatively, you can run the program interactively by typing image
 paths in the terminal (one per line, type Control-D when you want the
 model to run the input entered so far).
 
+# Deploying model to Tensorflow Model Serving
+
+To host models trained by this platform using Tensorflow Model Serving, 
+you would first need to convert the given checkpoint into the SavedModel 
+format. The SavedModel conversion script (`export_to_saved_model.py`) 
+allows you to restore an existing checkpoint, and export it as the
+SavedModel, which is required format by Tensorflow Model Serving. 
+
+Please edit scripts parameters and execute the following:
+
+    cd src ; python export_to_saved_model.py
+    
+# Validation with Tensorflow Model Serving
+
+We have created the example script (`tf_serving_predict.py`) , which 
+will use the specified image file and run it against the model hosted by 
+the Tensorflow Model Serving.
+
+Please edit scripts parameters and execute the following:
+
+    cd src ; python tf_serving_predict.py
+
 # Configuration
 
 There are many command-line options to configure training
@@ -240,7 +262,7 @@ Please cite the following [paper](https://weinman.cs.grinnell.edu/pubs/weinman19
 
 ```text
 @inproceedings{ weinman19deep,
-    author = {Jerod Weinman and Ziwen Chen and Ben Gafford and Nathan Gifford and Abyaya Lamsal and Liam Niehus-Staab},
+    author = {Jerod Weinman and Ziwen Chen and Ben Gafford and Nathan Gifford and Abyaya Lamsal and Liam Niehus-Staab and Igor Vishnevskiy},
     title = {Deep Neural Networks for Text Detection and Recognition in Historical Maps},
     booktitle = {Proc. IAPR International Conference on Document Analysis and Recognition},
     month = {Sep.},
