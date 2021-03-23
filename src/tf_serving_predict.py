@@ -23,6 +23,7 @@ from PIL import Image
 from tensorflow import saved_model as sm
 
 import charset as charset
+import mjsynth
 
 import datetime
 
@@ -74,6 +75,8 @@ class Predict():
 
         # in mjsynth, all three channels are the same in these grayscale-cum-RGB data
         image = image[:, :, :1]  # so just extract first channel, preserving 3D shape
+        image = mjsynth.preprocess_image(image)
+        image = image.eval(session=tf.compat.v1.Session())
 
         return image
 
@@ -84,7 +87,6 @@ class Predict():
         image = self.__get_image(FLAGS.image_path)
 
         h, w, c = image.shape
-        image = np.asarray(image).astype(np.float32)
         image = image[np.newaxis, :, :, :]
 
         request.inputs[IMAGE].CopyFrom(tf.compat.v1.make_tensor_proto(image, dtype=None, shape=image.shape))
