@@ -7,7 +7,7 @@ mjsynth-download: mjsynth-wget mjsynth-unpack
 mjsynth-wget:
 	mkdir -p data
 	cd data ; \
-	wget http://www.robots.ox.ac.uk/~vgg/data/text/mjsynth.tar.gz
+	wget https://thor.robots.ox.ac.uk/~vgg/data/text/mjsynth.tar.gz
 
 mjsynth-unpack:
 	mkdir -p data/images
